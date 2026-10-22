@@ -16,6 +16,7 @@ export const CONFIG_DEFAULT = {
   // false: cada día computa hasta 7 h y al banco va lo que pase de 7 h en el día.
   excedenteSemanal: false,
   horarioHabitual: '10:00–17:00',
+  salidaMaxMin: 19 * 60, // la salida cuenta como máximo hasta las 19:00
 };
 
 const DIA_COMPLETO = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación'];
@@ -75,7 +76,9 @@ export function calcularDia(rec, cfg = CONFIG_DEFAULT) {
     return res;
   }
 
-  const H = s - e;
+  const sCuenta = Math.min(s, cfg.salidaMaxMin ?? 24 * 60);
+  if (sCuenta < s) { res.salidaTope = true; res.avisos.push('La salida cuenta hasta las 19:00'); }
+  const H = Math.max(0, sCuenta - e);
   res.trabajadas = H;
 
   if (H < cfg.minimoMin) {

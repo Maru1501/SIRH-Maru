@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=20261022b';
-import { almacen, registroVacio } from './db.js?v=20261022b';
+} from './calc.js?v=20261022c';
+import { almacen, registroVacio } from './db.js?v=20261022c';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -78,7 +78,7 @@ function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
   const resumen = plegada ? `<button class="res-dia" data-abrir="${fecha}" aria-label="Editar ${nombreDia(fecha)} ${dd_mm(fecha)}">
       <span class="rd-dia">${DIAS_C[desdeIso(fecha).getDay()]} ${dd_mm(fecha)}${hoy ? ' <span class="etq">HOY</span>' : ''}</span>
       <span class="rd-det">${esc(detalle)}${r.nota ? ' · ' + esc(r.nota) : ''}</span>
-      <span class="rd-h num">${fmtHoras(c.computadas || c.trabajadas || null)}</span>
+      <span class="rd-h num">${fmtHoras(c.justificado ? c.computadas : c.trabajadas || null)}</span>
       <span class="estado ${c.tono}">${esc((c.estado || '').replace(/^Presente \((.*)\)$/, '$1').replace(/^./, x => x.toUpperCase()))}</span>
     </button>` : '';
   const listo = !plegada && (completo || ui.abiertos.has(fecha)) ? `<div class="c-listo"><button class="boton" data-cerrar="${fecha}">Listo ✓</button></div>` : '';

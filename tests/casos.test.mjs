@@ -47,7 +47,7 @@ caso('Quinto día trabajado va entero al banco', () => {
 });
 caso('Modo diario (tope 7 h/día) sigue disponible', () => {
   const cfg = { ...CONFIG_DEFAULT, excedenteSemanal: false };
-  const regs = { '2026-03-02': { entrada: '08:00', salida: '20:00' } };
+  const regs = { '2026-03-02': { entrada: '07:00', salida: '19:00' } };
   assert.equal(calcularDia(regs['2026-03-02'], cfg).computadas, h(7));
   assert.equal(libroBancoHoras(regs, [], cfg).saldo, h(5));
 });
@@ -76,6 +76,11 @@ caso('Lun 9:36 + Mar 7:30 + Mié y Jue vacaciones = cumplida, +3:06 al banco', (
   const regs = { '2026-10-19': { entrada: '09:22', salida: '18:58' }, '2026-10-20': { entrada: '10:35', salida: '18:05' },
     '2026-10-21': { novedad: 'Vacaciones' }, '2026-10-22': { novedad: 'Vacaciones' } };
   const s = calcularSemana('2026-10-19', regs); assert.equal(s.falta, 0); assert.equal(libroBancoHoras(regs, []).saldo, 186);
+});
+caso('Salida 19:35 cuenta hasta las 19:00', () => {
+  const c = calcularDia({ entrada: '10:30', salida: '19:20' });
+  assert.equal(c.trabajadas, h(8) + 30);
+  assert.equal(calcularDia({ entrada: '10:00', salida: '19:35' }).trabajadas, h(9));
 });
 caso('Falta una hora → No Entrada / No Salida', () => {
   assert.equal(calcularDia({ salida: '17:00' }).estado, 'No Entrada');
