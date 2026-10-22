@@ -103,8 +103,14 @@ function vistaSemana() {
 
   const avisos = [];
   if (s.meta === 0) avisos.push(['ok', 'Semana sin jornadas a cumplir (todos los días justificados).']);
-  else if (s.falta > 0) avisos.push(['alerta', `Faltan ${fmtHoras(s.falta)} para llegar a la meta de ${fmtHoras(s.meta)}.`]);
-  else avisos.push(['ok', `Meta semanal cumplida: ${fmtHoras(s.computadas)} de ${fmtHoras(s.meta)}.`]);
+  else {
+    const conMeta = 5 - s.justificados;
+    const origen = s.justificados && s.meta < CFG.metaSemanalMin
+      ? ` (${conMeta} ${conMeta === 1 ? 'día' : 'días'} × 7 h, porque ${s.justificados === 1 ? 'hay 1 día' : `hay ${s.justificados} días`} de vacaciones, franco, feriado o capacitación)` : '';
+    const sinCargar = s.dias.filter(d => d.calc.vacio).map(d => `${nombreDia(d.fecha).toLowerCase()} ${dd_mm(d.fecha)}`);
+    if (s.falta > 0) avisos.push(['alerta', `Faltan ${fmtHoras(s.falta)} para la meta de ${fmtHoras(s.meta)}${origen}.${sinCargar.length ? ` Sin cargar: ${sinCargar.join(', ')}.` : ''}`]);
+    else avisos.push(['ok', `Meta semanal cumplida: ${fmtHoras(s.computadas)} de ${fmtHoras(s.meta)}${origen}.`]);
+  }
   for (const d of s.dias) {
     if (d.calc.estado === 'Revisar') avisos.push(['malo', `${nombreDia(d.fecha)} ${dd_mm(d.fecha)}: menos de ${fmtHoras(CFG.minimoMin)} trabajadas. No se considera jornada cumplida.`]);
     else if (['No Entrada', 'No Salida', 'Revisar horario'].includes(d.calc.estado)) avisos.push(['malo', `${nombreDia(d.fecha)} ${dd_mm(d.fecha)}: ${d.calc.estado}${d.calc.avisos.length ? ' · ' + d.calc.avisos[0] : ''}.`]);
