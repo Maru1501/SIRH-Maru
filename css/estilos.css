@@ -61,6 +61,7 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -.02em; margin: 8px 0 6p
   transform: translateX(100%); visibility: hidden; transition: transform .2s ease, visibility .2s;
 }
 .menu-lateral.abierto { transform: none; visibility: visible; }
+.menu-info { display: none; }
 .menu-cab { display: flex; justify-content: space-between; align-items: center; padding: 0 6px 10px; }
 .menu-lateral button[data-vista] {
   text-align: left; border: 0; background: transparent; padding: 11px 12px; border-radius: 9px; cursor: pointer; font-weight: 500; color: var(--texto-2);
@@ -249,9 +250,21 @@ ol.pasos { padding-left: 20px; margin: 4px 0; display: grid; gap: 4px; }
   .rd-det { font-size: 13px; color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .rd-h { font-size: 13px; }
   .res-dia .estado { font-size: 11px; padding: 2px 6px; }
-  /* Cabecera y tarjetas más compactas para ver la semana sin bajar */
-  .bajada, .cabecera-der .pastilla:not(.boton-menu):not(.estado-sync) { display: none; }
-  h1 { font-size: 21px; margin: 4px 0 0; }
+  /* Cabecera mínima: fecha, título y estado pasan al menú lateral */
+  .pagina { padding-top: 10px; }
+  .cabecera > div:first-child { display: none; }
+  .cabecera-der { width: 100%; justify-content: space-between; flex-wrap: nowrap; }
+  .cabecera-der .pastilla:not(.boton-menu):not(.estado-sync) { display: none; }
+  .estado-sync { font-size: 0; padding: 0; width: 32px; height: 32px; justify-content: center; }
+  .pagina > .espacio:first-of-type { height: 10px; }
+  .menu-info { display: grid; gap: 4px; padding: 4px 6px 14px; margin-bottom: 6px; border-bottom: 1px solid var(--borde); }
+  .menu-titulo { font-size: 18px; font-weight: 600; }
+  .cab-semana { flex-wrap: nowrap; align-items: center; margin-bottom: 10px; }
+  .cab-semana .rotulo, .cab-semana #ir-fecha { display: none; }
+  .cab-semana h2 { font-size: 16px; margin: 0; white-space: nowrap; }
+  .cab-semana .controles { flex-wrap: nowrap; gap: 6px; }
+  .cab-semana .boton { min-height: 34px; padding: 4px 10px; }
+  .cab-semana .boton.icono { width: 34px; padding: 0; }
   .grilla-3 { grid-template-columns: repeat(3, 1fr) !important; gap: 8px; }
   .grilla-3 > :first-child { grid-column: auto !important; }
   .grilla-3 .tarjeta { padding: 10px 10px; border-radius: 12px; }

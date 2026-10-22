@@ -52,6 +52,7 @@ function pintarEstado() {
   el.className = 'pastilla estado-sync ' + almacen.estado;
   const txt = { local: 'Solo en este navegador', conectando: 'Conectando…', nube: 'Sincronizado con la base', error: 'Sin conexión a la base' }[almacen.estado];
   el.textContent = txt; el.title = almacen.error || '';
+  $('#menu-sync').textContent = txt + (almacen.error ? ` · ${almacen.error}` : '');
   pie.textContent = almacen.estado === 'nube' ? 'Guardado en la base de datos (Neon) y en este navegador'
     : almacen.estado === 'error' ? `Guardado solo en este navegador · ${almacen.error}`
     : 'Guardado en este navegador · Conectá la base en Configuración para usarla desde cualquier dispositivo';
@@ -165,7 +166,7 @@ function vistaSemana() {
   </section>
   <div class="espacio"></div>
   <section class="tarjeta">
-    <div class="bloque-cab">
+    <div class="bloque-cab cab-semana">
       <div><p class="rotulo">Registro semanal</p><h2>${rango}</h2></div>
       <div class="controles">
         <button class="boton icono" data-accion="sem-ant" aria-label="Semana anterior">←</button>
@@ -590,6 +591,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 {
   const d = new Date();
   $('#hoy-texto').textContent = `${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+  $('#menu-hoy').textContent = $('#hoy-texto').textContent;
 }
 almacen.alCambiar = pintarEstado;
 render();
