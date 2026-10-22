@@ -38,7 +38,8 @@ function toast(msg, error = false) {
 function render() {
   const foco = document.activeElement;
   const clave = foco && foco.dataset && foco.dataset.campo ? `[data-fecha="${foco.closest('[data-fecha]')?.dataset.fecha}"] [data-campo="${foco.dataset.campo}"]` : foco?.id ? `#${foco.id}` : null;
-  $$('.pestanas button').forEach(b => b.classList.toggle('activa', b.dataset.vista === ui.vista));
+  $$('.menu-lateral button[data-vista]').forEach(b => b.classList.toggle('activa', b.dataset.vista === ui.vista));
+  $('#vista-actual').textContent = { semana: 'Semana', anual: 'Carga anual', banco: 'Banco de horas', vacaciones: 'Vacaciones', config: 'Configuración' }[ui.vista];
   const v = $('#vista');
   v.innerHTML = { semana: vistaSemana, anual: vistaAnual, banco: vistaBanco, vacaciones: vistaVacaciones, config: vistaConfig }[ui.vista]();
   if (clave) { const el = $(clave); if (el && el !== document.body) el.focus({ preventScroll: true }); }
@@ -424,12 +425,23 @@ $('#archivo-importar').addEventListener('change', async ev => {
   } catch (e) { render(); toast(e.message || 'No se pudo leer el archivo', true); }
 });
 
+function menu(abrir) {
+  const m = $('#menu-lateral');
+  m.classList.toggle('abierto', abrir); m.setAttribute('aria-hidden', String(!abrir));
+  $('#velo').hidden = !abrir; $('#btn-menu').setAttribute('aria-expanded', String(abrir));
+  if (abrir) m.querySelector('button.activa')?.focus(); else if (m.contains(document.activeElement)) $('#btn-menu').focus();
+}
+$('#velo').addEventListener('click', () => menu(false));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') menu(false); });
+
 function irSemana(f) { ui.lunes = iso(lunesDe(desdeIso(f))); render(); }
 
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('button');
   if (!t) return;
-  if (t.dataset.vista) { ui.vista = t.dataset.vista; render(); window.scrollTo({ top: 0 }); return; }
+  if (t.id === 'btn-menu') return menu(true);
+  if (t.id === 'btn-cerrar-menu') return menu(false);
+  if (t.dataset.vista) { menu(false); ui.vista = t.dataset.vista; render(); window.scrollTo({ top: 0 }); return; }
   if (t.dataset.ir) { ui.vista = t.dataset.ir; render(); window.scrollTo({ top: 0 }); return; }
   if (t.dataset.borrarMov) {
     if (!confirm('¿Borrar este movimiento?')) return;

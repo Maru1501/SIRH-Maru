@@ -50,17 +50,23 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -.02em; margin: 8px 0 6p
 .estado-sync.error::before { background: var(--rojo); }
 .estado-sync.local { background: #ecebe4; color: var(--texto-2); border-color: var(--borde); }
 
-/* Pestañas */
-.pestanas {
-  display: flex; gap: 4px; margin: 22px 0 18px; padding: 4px; background: #e9e7df; border-radius: 12px;
-  overflow-x: auto; scrollbar-width: none;
+/* Menú lateral */
+.boton-menu { cursor: pointer; background: var(--tarjeta); color: var(--texto); border-color: var(--borde-fuerte); font-weight: 600; }
+.boton-menu:hover { border-color: var(--texto-3); }
+.velo { position: fixed; inset: 0; background: rgba(20, 30, 25, .28); z-index: 30; }
+.menu-lateral {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 260px; max-width: 85vw; z-index: 31;
+  background: var(--tarjeta); border-left: 1px solid var(--borde); box-shadow: -8px 0 30px rgba(20,40,30,.12);
+  padding: 18px 14px; display: flex; flex-direction: column; gap: 4px;
+  transform: translateX(100%); visibility: hidden; transition: transform .2s ease, visibility .2s;
 }
-.pestanas::-webkit-scrollbar { display: none; }
-.pestanas button {
-  border: 0; background: transparent; padding: 8px 14px; border-radius: 9px; cursor: pointer;
-  color: var(--texto-2); font-weight: 500; white-space: nowrap;
+.menu-lateral.abierto { transform: none; visibility: visible; }
+.menu-cab { display: flex; justify-content: space-between; align-items: center; padding: 0 6px 10px; }
+.menu-lateral button[data-vista] {
+  text-align: left; border: 0; background: transparent; padding: 11px 12px; border-radius: 9px; cursor: pointer; font-weight: 500; color: var(--texto-2);
 }
-.pestanas button.activa { background: var(--tarjeta); color: var(--texto); box-shadow: var(--sombra); }
+.menu-lateral button[data-vista]:hover { background: #f3f2ec; }
+.menu-lateral button[data-vista].activa { background: var(--verde-claro); color: var(--verde); font-weight: 600; }
 
 /* Tarjetas */
 .tarjeta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio); padding: 20px 22px; box-shadow: var(--sombra); }
