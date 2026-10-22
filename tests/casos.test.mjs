@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { CONFIG_DEFAULT, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones } from '../js/calc.js';
+import { CONFIG_DEFAULT as BASE, calcularDia as cd, calcularSemana as cs, libroBancoHoras as lbh, libroBancoVacaciones } from '../js/calc.js';
+const CONFIG_DEFAULT = { ...BASE, excedenteSemanal: true };
+const calcularDia = (r, c = CONFIG_DEFAULT) => cd(r, c), calcularSemana = (l, r, c = CONFIG_DEFAULT) => cs(l, r, c), libroBancoHoras = (r, m, c = CONFIG_DEFAULT) => lbh(r, m, c);
 const h = n => n * 60;
 let ok = 0;
 function caso(nombre, fn) { fn(); ok++; console.log('✓', nombre); }

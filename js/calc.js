@@ -14,7 +14,7 @@ export const CONFIG_DEFAULT = {
   francosAnio: 15,
   // true: cada día suma sus horas reales y al banco va lo que pase de la meta semanal.
   // false: cada día computa hasta 7 h y al banco va lo que pase de 7 h en el día.
-  excedenteSemanal: true,
+  excedenteSemanal: false,
   horarioHabitual: '10:00–17:00',
 };
 
