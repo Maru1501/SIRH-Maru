@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js';
-import { almacen, registroVacio } from './db.js';
+} from './calc.js?v=20261022b';
+import { almacen, registroVacio } from './db.js?v=20261022b';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
