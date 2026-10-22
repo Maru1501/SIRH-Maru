@@ -55,7 +55,7 @@ export function calcularDia(rec, cfg = CONFIG_DEFAULT) {
     // Día justificado: cuenta como 7 h trabajadas y figura Presente.
     res.estado = `Presente (${novedad.toLowerCase()})`;
     res.tono = 'info';
-    res.computadas = cfg.jornadaMin;
+    res.computadas = novedad === 'Home office' ? 0 : cfg.jornadaMin; // home office solo registra el día
     if (novedad === 'Vacaciones') res.vacaciones = -1;
     if (novedad === 'Franco') res.descuento = cfg.jornadaMin;
     res.justificado = true;

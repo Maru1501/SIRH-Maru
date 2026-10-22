@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=20261022d';
-import { almacen, registroVacio } from './db.js?v=20261022d';
+} from './calc.js?v=20261022e';
+import { almacen, registroVacio } from './db.js?v=20261022e';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -119,10 +119,11 @@ function vistaSemana() {
   const pctSemana = s.meta ? Math.min(100, s.computadas / s.meta * 100) : 100;
 
   const avisos = [];
+  let metaBanner;
   {
     const sinCargar = s.dias.filter(d => d.calc.vacio).map(d => `${nombreDia(d.fecha).toLowerCase()} ${dd_mm(d.fecha)}`);
-    if (s.falta > 0) avisos.push(['alerta', `Faltan ${fmtHoras(s.falta)} para la meta de ${fmtHoras(s.meta)}.${sinCargar.length ? ` Sin cargar: ${sinCargar.join(', ')}.` : ''}`]);
-    else avisos.push(['ok', `Meta semanal cumplida: ${fmtHoras(s.computadas)} de ${fmtHoras(s.meta)}.`]);
+    if (s.falta > 0) metaBanner = ['malo', `Faltan ${fmtHoras(s.falta)} para la meta de ${fmtHoras(s.meta)}.${sinCargar.length ? ` Sin cargar: ${sinCargar.join(', ')}.` : ''}`];
+    else metaBanner = ['ok', `Meta semanal cumplida: ${fmtHoras(s.computadas)} de ${fmtHoras(s.meta)}.`];
   }
   for (const d of s.dias) {
     if (d.calc.estado === 'Revisar') avisos.push(['malo', `${nombreDia(d.fecha)} ${dd_mm(d.fecha)}: menos de ${fmtHoras(CFG.minimoMin)} trabajadas. No se considera jornada cumplida.`]);
@@ -159,7 +160,7 @@ function vistaSemana() {
       <p class="rotulo">Días cumplidos</p>
       <p class="cifra">${s.cumplidos} <small>/ ${CFG.metaSemanalMin / CFG.jornadaMin} días</small></p>
       <div class="chips">${s.dias.map(d => {
-        const cls = d.calc.computadas > 0 ? 'si' : s.revisar.includes(d) ? 'no' : '';
+        const cls = d.calc.computadas > 0 || d.calc.justificado ? 'si' : s.revisar.includes(d) ? 'no' : '';
         return `<span class="chip ${cls}" title="${esc(d.calc.estado)}">${DIAS_C[desdeIso(d.fecha).getDay()]}</span>`;
       }).join('')}</div>
     </div>
@@ -175,6 +176,7 @@ function vistaSemana() {
         <input class="campo" type="date" id="ir-fecha" value="${ui.lunes}" aria-label="Ir a la semana de">
       </div>
     </div>
+    <div class="av meta-banner ${metaBanner[0]}">${esc(metaBanner[1])}</div>
     <div class="dias" id="dias-semana">${cabeceraDias()}${(() => {
       const primero = s.dias.find(d => !diaCompleto(d.rec, d.calc))?.fecha;
       return s.dias.map(d => filaDia(d.fecha, d.rec, d.calc, { plegarVacio: d.fecha !== primero })).join('');
@@ -183,7 +185,7 @@ function vistaSemana() {
       <div class="avisos" style="flex:1;min-width:240px">${avisos.map(([t, m]) => `<div class="av ${t}">${esc(m)}</div>`).join('')}</div>
       <div class="nota" style="text-align:right">Computadas <b>${fmtHoras(s.computadas)}</b> de ${fmtHoras(s.meta)}<br>Trabajadas reales ${fmtHoras(s.trabajadas)}</div>
     </div>
-    <p class="pie-tarjeta">Los cambios se guardan solos. Meta: 28 h en 4 días. Mínimo real de 4 h por día.${CFG.excedenteSemanal ? ' Lo que pase de 28 h en la semana va al banco.' : ''} Vacaciones, franco, feriado, capacitación y home office cuentan como 7 h.</p>
+    <p class="pie-tarjeta">Los cambios se guardan solos. Meta: 28 h en 4 días. Mínimo real de 4 h por día.${CFG.excedenteSemanal ? ' Lo que pase de 28 h en la semana va al banco.' : ''} Vacaciones, franco, feriado y capacitación cuentan como 7 h; home office solo registra el día.</p>
   </section>
   <div class="espacio"></div>
   <section class="grilla-2">
@@ -214,7 +216,8 @@ function ayuda() {
     <li>${CFG.excedenteSemanal ? 'Día normal: suma sus horas reales a la semana. Lo que pase de 28 h en la semana se suma al banco (por ejemplo, un quinto día trabajado).' : 'Día normal: computa hasta 7 h para la semana. Lo que pase de 7 h se suma al banco.'}</li>
     <li><b>Entrada demorada</b> o <b>salida anticipada</b> (con al menos 4 h): figura Presente, computa 7 h y descuenta del banco lo que falta para 7 h.</li>
     <li>Menos de 4 h trabajadas: <b>Revisar</b>, no computa ni descuenta.</li>
-    <li><b>Vacaciones, feriado, capacitación y home office</b> justifican el día: figura Presente y cuenta 7 h, sin mover el banco de horas. Vacaciones resta 1 día del banco de vacaciones.</li>
+    <li><b>Home office</b>: registra el día, no suma horas ni mueve el banco.</li>
+    <li><b>Vacaciones, feriado y capacitación</b> justifican el día: figura Presente y cuenta 7 h, sin mover el banco de horas. Vacaciones resta 1 día del banco de vacaciones.</li>
     <li><b>Franco</b> justifica el día (7 h), descuenta 7 h del banco de horas y suma un franco usado de los 15 del año.</li>
     <li><b>Capacitación</b>: 4 obligatorias por año, la app no deja cargar una quinta.</li>
     <li>El banco de horas va de 0 a 70 h: lo que supere 70 h se pierde y nunca queda negativo.</li>
