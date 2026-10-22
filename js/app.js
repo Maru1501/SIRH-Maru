@@ -26,6 +26,7 @@ const ui = {
   borrador: {},
   rango: { desde: '', hasta: '', entrada: '', salida: '', novedad: 'Sin novedad', soloVacios: true },
   anioBanco: 'todos',
+  abiertos: new Set(), // días cargados que se abrieron para editar (en el celular)
 };
 
 // ---------- utilidades de interfaz ----------
@@ -64,11 +65,23 @@ function celdaBanco(c) {
   return `<span class="num gris">—</span>`;
 }
 
-function filaDia(fecha, rec, c, { sucia = false } = {}) {
+function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
   const r = rec || {};
   const hoy = fecha === hoyIso();
   const avisos = c.avisos.length ? `<div class="aviso-dia">${esc(c.avisos.join(' · '))}</div>` : '';
-  return `<div class="fila${hoy ? ' hoy' : ''}${sucia ? ' sucia' : ''}" data-fecha="${fecha}">
+  const completo = diaCompleto(r, c);
+  const plegada = (completo || plegarVacio) && !ui.abiertos.has(fecha);
+  const detalle = c.justificado ? r.novedad
+    : completo ? `${r.entrada}–${r.salida}${r.novedad && r.novedad !== 'Sin novedad' ? ' · ' + r.novedad : ''}`
+    : c.vacio ? 'Tocá para cargar' : `${r.entrada || '--:--'}–${r.salida || '--:--'}`;
+  const resumen = plegada ? `<button class="res-dia" data-abrir="${fecha}" aria-label="Editar ${nombreDia(fecha)} ${dd_mm(fecha)}">
+      <span class="rd-dia">${DIAS_C[desdeIso(fecha).getDay()]} ${dd_mm(fecha)}${hoy ? ' <span class="etq">HOY</span>' : ''}</span>
+      <span class="rd-det">${esc(detalle)}${r.nota ? ' · ' + esc(r.nota) : ''}</span>
+      <span class="rd-h num">${fmtHoras(c.computadas || c.trabajadas || null)}</span>
+      <span class="estado ${c.tono}">${esc((c.estado || '').replace(/^Presente \((.*)\)$/, '$1').replace(/^./, x => x.toUpperCase()))}</span>
+    </button>` : '';
+  const listo = !plegada && (completo || ui.abiertos.has(fecha)) ? `<div class="c-listo"><button class="boton" data-cerrar="${fecha}">Listo ✓</button></div>` : '';
+  return `<div class="fila${hoy ? ' hoy' : ''}${sucia ? ' sucia' : ''}${plegada ? ' plegada' : ''}" data-fecha="${fecha}">${resumen}
     <div class="c-dia dia"><b>${nombreDia(fecha)} ${dd_mm(fecha)}</b>${hoy ? '<span class="etq">HOY</span>' : ''}${avisos}</div>
     <div class="c-ent"><span class="lbl-movil">Entrada</span><input class="campo" type="time" data-campo="entrada" value="${esc(r.entrada)}" aria-label="Entrada ${fecha}"></div>
     <div class="c-sal"><span class="lbl-movil">Salida</span><input class="campo" type="time" data-campo="salida" value="${esc(r.salida)}" aria-label="Salida ${fecha}"></div>
@@ -77,9 +90,11 @@ function filaDia(fecha, rec, c, { sucia = false } = {}) {
     <div class="c-trab"><span class="lbl-movil">Trabajadas</span><span class="num ${c.trabajadas ? 'ocre' : 'gris'}">${fmtHoras(c.trabajadas || null)}</span></div>
     <div class="c-comp"><span class="lbl-movil">Computadas</span><span class="num">${c.computadas ? fmtHoras(c.computadas) : '<span class="gris">0 h</span>'}</span></div>
     <div class="c-banco"><span class="lbl-movil">Banco</span>${celdaBanco(c)}</div>
-    <div class="c-estado">${c.estado ? `<span class="estado ${c.tono}">${esc(c.estado)}</span>` : ''}</div>
+    <div class="c-estado">${c.estado ? `<span class="estado ${c.tono}">${esc(c.estado)}</span>` : ''}</div>${listo}
   </div>`;
 }
+
+function diaCompleto(r, c) { return !!(c.justificado || (r && r.entrada && r.salida)); }
 
 const cabeceraDias = () => `<div class="dias-cab"><span>Día</span><span>Entrada</span><span>Salida</span><span>Novedad</span><span>Nota</span><span>Trabajadas</span><span>Computadas</span><span>Banco</span><span>Estado</span></div>`;
 
@@ -159,7 +174,10 @@ function vistaSemana() {
         <input class="campo" type="date" id="ir-fecha" value="${ui.lunes}" aria-label="Ir a la semana de">
       </div>
     </div>
-    <div class="dias" id="dias-semana">${cabeceraDias()}${s.dias.map(d => filaDia(d.fecha, d.rec, d.calc)).join('')}</div>
+    <div class="dias" id="dias-semana">${cabeceraDias()}${(() => {
+      const primero = s.dias.find(d => !diaCompleto(d.rec, d.calc))?.fecha;
+      return s.dias.map(d => filaDia(d.fecha, d.rec, d.calc, { plegarVacio: d.fecha !== primero })).join('');
+    })()}</div>
     <div class="resumen">
       <div class="avisos" style="flex:1;min-width:240px">${avisos.map(([t, m]) => `<div class="av ${t}">${esc(m)}</div>`).join('')}</div>
       <div class="nota" style="text-align:right">Computadas <b>${fmtHoras(s.computadas)}</b> de ${fmtHoras(s.meta)}<br>Trabajadas reales ${fmtHoras(s.trabajadas)}</div>
@@ -439,6 +457,8 @@ function irSemana(f) { ui.lunes = iso(lunesDe(desdeIso(f))); render(); }
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('button');
   if (!t) return;
+  if (t.dataset.abrir) { ui.abiertos.add(t.dataset.abrir); render(); $(`[data-fecha="${t.dataset.abrir}"] [data-campo=novedad]`)?.focus({ preventScroll: true }); return; }
+  if (t.dataset.cerrar) { ui.abiertos.delete(t.dataset.cerrar); return render(); } // por teclado
   if (t.id === 'btn-menu') return menu(true);
   if (t.id === 'btn-cerrar-menu') return menu(false);
   if (t.dataset.vista) { menu(false); ui.vista = t.dataset.vista; render(); window.scrollTo({ top: 0 }); return; }
@@ -535,19 +555,33 @@ document.addEventListener('change', async ev => {
     return;
   }
   if (!el.dataset.campo) return;
-  const fila = el.closest('[data-fecha]');
+  await aplicarFila(el.closest('[data-fecha]'));
+});
+
+async function aplicarFila(fila) {
   const fecha = fila.dataset.fecha;
   const rec = leerFila(fila);
-  if (rec.entrada && rec.salida && rec.salida <= rec.entrada && rec.novedad !== 'Vacaciones') toast('La salida tiene que ser posterior a la entrada', true);
+  const original = ui.borrador[fecha] || almacen.datos.registros[fecha];
+  const norm = r => JSON.stringify({ entrada: r?.entrada || '', salida: r?.salida || '', novedad: r?.novedad || 'Sin novedad', nota: r?.nota || '' });
+  if (norm(rec) === norm(original)) return render();
+  if (rec.entrada && rec.salida && rec.salida <= rec.entrada) toast('La salida tiene que ser posterior a la entrada', true);
   if (ui.vista === 'semana') {
     await guardar({ [fecha]: rec });
-    render();
   } else if (ui.vista === 'anual') {
-    const original = almacen.datos.registros[fecha];
-    const igual = JSON.stringify({ entrada: '', salida: '', novedad: 'Sin novedad', nota: '', ...(original || {}) }) === JSON.stringify({ entrada: '', salida: '', novedad: 'Sin novedad', nota: '', ...rec });
-    if (igual) delete ui.borrador[fecha]; else ui.borrador[fecha] = rec;
-    render();
+    if (norm(rec) === norm(almacen.datos.registros[fecha])) delete ui.borrador[fecha]; else ui.borrador[fecha] = rec;
   }
+  render();
+}
+
+// "Listo" se procesa al apoyar el dedo, antes de que el campo pierda el foco y se redibuje la fila.
+document.addEventListener('pointerdown', async ev => {
+  const t = ev.target.closest('[data-cerrar]');
+  if (!t) return;
+  ev.preventDefault();
+  const fila = t.closest('[data-fecha]');
+  ui.abiertos.delete(fila.dataset.fecha);
+  if (document.activeElement && fila.contains(document.activeElement)) document.activeElement.blur();
+  await aplicarFila(fila);
 });
 
 window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).length) { e.preventDefault(); e.returnValue = ''; } });
