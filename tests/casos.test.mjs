@@ -82,6 +82,10 @@ caso('Salida 19:35 cuenta hasta las 19:00', () => {
   assert.equal(c.trabajadas, h(8) + 30);
   assert.equal(calcularDia({ entrada: '10:00', salida: '19:35' }).trabajadas, h(9));
 });
+caso('Home office: día completo, cuenta 7 h, sin banco', () => {
+  const c = calcularDia({ novedad: 'Home office' });
+  assert.equal(c.computadas, h(7)); assert.equal(c.descuento, 0); assert.equal(c.estado, 'Presente (home office)');
+});
 caso('Falta una hora → No Entrada / No Salida', () => {
   assert.equal(calcularDia({ salida: '17:00' }).estado, 'No Entrada');
   assert.equal(calcularDia({ entrada: '10:00' }).estado, 'No Salida');

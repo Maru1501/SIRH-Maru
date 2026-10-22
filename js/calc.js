@@ -2,7 +2,7 @@
 
 export const NOVEDADES = [
   'Sin novedad', 'Vacaciones', 'Franco', 'Feriado',
-  'Entrada Demorada', 'Salida Anticipada', 'Capacitación', 'Trámite',
+  'Entrada Demorada', 'Salida Anticipada', 'Capacitación', 'Home office',
 ];
 
 export const CONFIG_DEFAULT = {
@@ -19,7 +19,7 @@ export const CONFIG_DEFAULT = {
   salidaMaxMin: 19 * 60, // la salida cuenta como máximo hasta las 19:00
 };
 
-const DIA_COMPLETO = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación'];
+const DIA_COMPLETO = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office'];
 const JUSTIFICA_FALTANTE = ['Entrada Demorada', 'Salida Anticipada'];
 
 export function aMinutos(hhmm) {
@@ -95,10 +95,6 @@ export function calcularDia(rec, cfg = CONFIG_DEFAULT) {
     res.computadas = semanal ? Math.max(H, J) : J;
     res.descuento = Math.max(0, J - H);
     res.estado = novedad === 'Entrada Demorada' ? 'Presente (demora)' : 'Presente (salida anticipada)';
-    res.tono = 'ok';
-  } else if (novedad === 'Trámite') {
-    res.computadas = semanal ? Math.max(H, J) : J;
-    res.estado = 'Presente (trámite)';
     res.tono = 'ok';
   } else {
     res.computadas = semanal ? H : Math.min(H, J);
