@@ -11,6 +11,7 @@ export const CONFIG_DEFAULT = {
   metaSemanalMin: 28 * 60, // meta semanal
   topeBancoMin: 70 * 60,   // tope del banco de horas
   capacitacionesAnio: 4,
+  francosAnio: 15,
   horarioHabitual: '10:00–17:00',
 };
 
@@ -47,10 +48,12 @@ export function calcularDia(rec, cfg = CONFIG_DEFAULT) {
   };
 
   if (DIA_COMPLETO.includes(novedad)) {
-    res.estado = novedad === 'Capacitación' ? 'Capacitación (registro)'
-      : novedad === 'Vacaciones' ? 'Vacaciones' : novedad;
+    // Día justificado: cuenta como 7 h trabajadas y figura Presente.
+    res.estado = `Presente (${novedad.toLowerCase()})`;
     res.tono = 'info';
+    res.computadas = cfg.jornadaMin;
     if (novedad === 'Vacaciones') res.vacaciones = -1;
+    if (novedad === 'Franco') res.descuento = cfg.jornadaMin;
     res.justificado = true;
     return res;
   }
@@ -122,7 +125,7 @@ export function calcularSemana(lunesIso, registros, cfg = CONFIG_DEFAULT) {
     dias.push({ fecha: f, rec: registros[f] || null, calc: calcularDia(registros[f], cfg) });
   }
   const justificados = dias.filter(d => d.calc.justificado).length;
-  const meta = Math.min(cfg.metaSemanalMin, cfg.jornadaMin * (5 - justificados));
+  const meta = cfg.metaSemanalMin;
   const computadas = dias.reduce((a, d) => a + d.calc.computadas, 0);
   const trabajadas = dias.reduce((a, d) => a + (d.calc.trabajadas || 0), 0);
   const descuento = dias.reduce((a, d) => a + d.calc.descuento, 0);

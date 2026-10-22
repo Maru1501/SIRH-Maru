@@ -102,14 +102,10 @@ function vistaSemana() {
   const pctSemana = s.meta ? Math.min(100, s.computadas / s.meta * 100) : 100;
 
   const avisos = [];
-  if (s.meta === 0) avisos.push(['ok', 'Semana sin jornadas a cumplir (todos los días justificados).']);
-  else {
-    const conMeta = 5 - s.justificados;
-    const origen = s.justificados && s.meta < CFG.metaSemanalMin
-      ? ` (${conMeta} ${conMeta === 1 ? 'día' : 'días'} × 7 h, porque ${s.justificados === 1 ? 'hay 1 día' : `hay ${s.justificados} días`} de vacaciones, franco, feriado o capacitación)` : '';
+  {
     const sinCargar = s.dias.filter(d => d.calc.vacio).map(d => `${nombreDia(d.fecha).toLowerCase()} ${dd_mm(d.fecha)}`);
-    if (s.falta > 0) avisos.push(['alerta', `Faltan ${fmtHoras(s.falta)} para la meta de ${fmtHoras(s.meta)}${origen}.${sinCargar.length ? ` Sin cargar: ${sinCargar.join(', ')}.` : ''}`]);
-    else avisos.push(['ok', `Meta semanal cumplida: ${fmtHoras(s.computadas)} de ${fmtHoras(s.meta)}${origen}.`]);
+    if (s.falta > 0) avisos.push(['alerta', `Faltan ${fmtHoras(s.falta)} para la meta de ${fmtHoras(s.meta)}.${sinCargar.length ? ` Sin cargar: ${sinCargar.join(', ')}.` : ''}`]);
+    else avisos.push(['ok', `Meta semanal cumplida: ${fmtHoras(s.computadas)} de ${fmtHoras(s.meta)}.`]);
   }
   for (const d of s.dias) {
     if (d.calc.estado === 'Revisar') avisos.push(['malo', `${nombreDia(d.fecha)} ${dd_mm(d.fecha)}: menos de ${fmtHoras(CFG.minimoMin)} trabajadas. No se considera jornada cumplida.`]);
@@ -144,7 +140,7 @@ function vistaSemana() {
     </div>
     <div class="tarjeta">
       <p class="rotulo">Días cumplidos</p>
-      <p class="cifra">${s.cumplidos} <small>/ ${5 - s.justificados} días</small></p>
+      <p class="cifra">${s.cumplidos} <small>/ ${CFG.metaSemanalMin / CFG.jornadaMin} días</small></p>
       <div class="chips">${s.dias.map(d => {
         const cls = d.calc.computadas > 0 ? 'si' : s.revisar.includes(d) ? 'no' : '';
         return `<span class="chip ${cls}" title="${esc(d.calc.estado)}">${DIAS_C[desdeIso(d.fecha).getDay()]}</span>`;
@@ -167,14 +163,14 @@ function vistaSemana() {
       <div class="avisos" style="flex:1;min-width:240px">${avisos.map(([t, m]) => `<div class="av ${t}">${esc(m)}</div>`).join('')}</div>
       <div class="nota" style="text-align:right">Computadas <b>${fmtHoras(s.computadas)}</b> de ${fmtHoras(s.meta)}<br>Trabajadas reales ${fmtHoras(s.trabajadas)}</div>
     </div>
-    <p class="pie-tarjeta">Los cambios se guardan solos. Jornada de 7 h, mínimo real de 4 h por día. La meta se ajusta si hay días de vacaciones, franco, feriado o capacitación.</p>
+    <p class="pie-tarjeta">Los cambios se guardan solos. Meta: 28 h (4 días de 7 h). Mínimo real de 4 h por día. Vacaciones, franco, feriado y capacitación cuentan como 7 h.</p>
   </section>
   <div class="espacio"></div>
   <section class="grilla-2">
     <div class="tarjeta lista-nov">
       <p class="rotulo">Tus novedades</p>
       <div class="item"><div><b>Vacaciones</b><span>Días disponibles</span></div><div class="val" style="${vac.saldo < 0 ? 'color:var(--rojo)' : ''}">${vac.saldo}</div></div>
-      <div class="item"><div><b>Francos</b><span>Usados en ${anio}</span></div><div class="val">${francos}</div></div>
+      <div class="item"><div><b>Francos</b><span>Usados en ${anio} · 7 h del banco cada uno</span></div><div class="val" style="${francos > CFG.francosAnio ? 'color:var(--rojo)' : ''}">${francos} <small>/ ${CFG.francosAnio}</small></div></div>
       <div class="item"><div><b>Capacitación</b><span>Obligatorias en ${anio}</span></div><div class="val">${capac} <small>/ ${CFG.capacitacionesAnio}</small></div></div>
     </div>
     <div class="tarjeta">
@@ -199,9 +195,11 @@ function ayuda() {
     <li><b>Entrada demorada</b> o <b>salida anticipada</b> (con al menos 4 h): figura Presente, computa 7 h y descuenta del banco lo que falta para 7 h.</li>
     <li><b>Trámite</b> (con al menos 4 h): computa 7 h y no descuenta del banco.</li>
     <li>Menos de 4 h trabajadas: <b>Revisar</b>, no computa ni descuenta.</li>
-    <li>Vacaciones, franco, feriado y capacitación no computan ni descuentan. Vacaciones resta 1 día del banco de vacaciones.</li>
+    <li><b>Vacaciones, feriado y capacitación</b> justifican el día: figura Presente y cuenta 7 h, sin mover el banco de horas. Vacaciones resta 1 día del banco de vacaciones.</li>
+    <li><b>Franco</b> justifica el día (7 h), descuenta 7 h del banco de horas y suma un franco usado de los 15 del año.</li>
+    <li><b>Capacitación</b>: 4 obligatorias por año, la app no deja cargar una quinta.</li>
     <li>El banco de horas va de 0 a 70 h: lo que supere 70 h se pierde y nunca queda negativo.</li>
-    <li>Meta semanal: 28 h, o 7 h por cada día laborable sin novedad de día completo si son menos.</li>
+    <li>Meta semanal: 28 h, o sea 4 días de 7 h. Cada día computa como máximo 7 h.</li>
   </ul></details>`;
 }
 
@@ -379,6 +377,7 @@ function vistaConfig() {
       <div><span>Tope banco de horas</span><b>70 h</b></div>
       <div><span>Días laborables</span><b>Lunes a viernes</b></div>
       <div><span>Capacitaciones</span><b>4 por año</b></div>
+      <div><span>Francos</span><b>15 por año · 7 h c/u</b></div>
     </div>
   </section>
   <div class="espacio"></div>
@@ -391,9 +390,20 @@ function vistaConfig() {
 }
 
 // ---------- acciones ----------
+function capacitacionesDeMas(cambios) {
+  const todos = { ...almacen.datos.registros, ...cambios };
+  const porAnio = {};
+  for (const [f, r] of Object.entries(todos)) if (r && r.novedad === 'Capacitación') porAnio[f.slice(0, 4)] = (porAnio[f.slice(0, 4)] || 0) + 1;
+  const anios = new Set(Object.entries(cambios).filter(([, r]) => r && r.novedad === 'Capacitación').map(([f]) => f.slice(0, 4)));
+  return [...anios].find(a => porAnio[a] > CFG.capacitacionesAnio);
+}
+
 async function guardar(cambios, okMsg) {
+  const anio = capacitacionesDeMas(cambios);
+  if (anio) { toast(`Ya hay ${CFG.capacitacionesAnio} capacitaciones en ${anio}. No se puede cargar otra.`, true); return false; }
   try { await almacen.guardarRegistros(cambios); if (okMsg) toast(okMsg); }
   catch (e) { toast(e.message, true); }
+  return true;
 }
 
 function exportar() {
@@ -440,15 +450,15 @@ document.addEventListener('click', async ev => {
     case 'guardar-todo': {
       const n = Object.keys(ui.borrador).length;
       t.disabled = true; t.textContent = 'Guardando…';
-      await guardar(ui.borrador, `${n} ${n === 1 ? 'día guardado' : 'días guardados'}`);
-      ui.borrador = {}; render(); break;
+      if (await guardar(ui.borrador, `${n} ${n === 1 ? 'día guardado' : 'días guardados'}`)) ui.borrador = {};
+      render(); break;
     }
     case 'guardar-mes': {
       const pref = `${ui.anio}-${String(ui.mes + 1).padStart(2, '0')}`;
       const lote = Object.fromEntries(Object.entries(ui.borrador).filter(([f]) => f.startsWith(pref)));
       t.disabled = true;
-      await guardar(lote, `${Object.keys(lote).length} días de ${MESES[ui.mes]} guardados`);
-      for (const f of Object.keys(lote)) delete ui.borrador[f];
+      if (await guardar(lote, `${Object.keys(lote).length} días de ${MESES[ui.mes]} guardados`))
+        for (const f of Object.keys(lote)) delete ui.borrador[f];
       render(); break;
     }
     case 'aplicar-rango': {

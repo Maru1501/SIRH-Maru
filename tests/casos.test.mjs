@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calcularDia, libroBancoHoras, libroBancoVacaciones } from '../js/calc.js';
+import { calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones } from '../js/calc.js';
 const h = n => n * 60;
 let ok = 0;
 function caso(nombre, fn) { fn(); ok++; console.log('✓', nombre); }
@@ -24,7 +24,7 @@ caso('Vacaciones → −1 día', () => {
   const regs = { '2026-03-02': { novedad: 'Vacaciones' } };
   const v = libroBancoVacaciones(regs, [{ banco: 'vacaciones', fecha: '2026-01-01', cantidad: 10 }]);
   assert.equal(v.saldo, 9);
-  const c = calcularDia(regs['2026-03-02']); assert.equal(c.computadas, 0); assert.equal(c.descuento, 0);
+  const c = calcularDia(regs['2026-03-02']); assert.equal(c.computadas, h(7)); assert.equal(c.descuento, 0); assert.match(c.estado, /^Presente/);
 });
 caso('Banco 68 h + 5 h → 70, 3 h perdidas', () => {
   const regs = { '2026-03-02': { entrada: '08:00', salida: '20:00', novedad: 'Sin novedad' } }; // 12 h → +5
@@ -36,9 +36,26 @@ caso('Descuento que dejaría negativo → queda en 0', () => {
   const b = libroBancoHoras(regs, [{ banco: 'horas', fecha: '2026-01-01', cantidad: h(1) }]);
   assert.equal(b.saldo, 0); assert.equal(b.sinDescontar, h(2));
 });
-caso('Capacitación: registra, no computa, no descuenta', () => {
+caso('Capacitación: cuenta 7 h, no descuenta banco', () => {
   const c = calcularDia({ novedad: 'Capacitación', entrada: '10:00', salida: '12:00' });
-  assert.equal(c.computadas, 0); assert.equal(c.descuento, 0); assert.match(c.estado, /Capacitación/);
+  assert.equal(c.computadas, h(7)); assert.equal(c.descuento, 0); assert.match(c.estado, /capacitación/);
+});
+caso('Franco: cuenta 7 h y descuenta 7 h del banco', () => {
+  const regs = { '2026-03-02': { novedad: 'Franco' } };
+  const c = calcularDia(regs['2026-03-02']); assert.equal(c.computadas, h(7)); assert.equal(c.descuento, h(7));
+  const b = libroBancoHoras(regs, [{ banco: 'horas', fecha: '2026-01-01', cantidad: h(10) }]);
+  assert.equal(b.saldo, h(3));
+});
+caso('Lun 7 + Mar 7 + Mié 7 + Jue vacaciones = semana cumplida sin banco', () => {
+  const regs = { '2026-10-19': { entrada: '10:00', salida: '17:00' }, '2026-10-20': { entrada: '10:00', salida: '17:00' },
+    '2026-10-21': { entrada: '10:00', salida: '17:00' }, '2026-10-22': { novedad: 'Vacaciones' } };
+  const s = calcularSemana('2026-10-19', regs); assert.equal(s.computadas, h(28)); assert.equal(s.falta, 0);
+  assert.equal(libroBancoHoras(regs, []).saldo, 0);
+});
+caso('Lun 9:36 + Mar 7:30 + Mié y Jue vacaciones = cumplida, +3:06 al banco', () => {
+  const regs = { '2026-10-19': { entrada: '09:22', salida: '18:58' }, '2026-10-20': { entrada: '10:35', salida: '18:05' },
+    '2026-10-21': { novedad: 'Vacaciones' }, '2026-10-22': { novedad: 'Vacaciones' } };
+  const s = calcularSemana('2026-10-19', regs); assert.equal(s.falta, 0); assert.equal(libroBancoHoras(regs, []).saldo, 186);
 });
 caso('Falta una hora → No Entrada / No Salida', () => {
   assert.equal(calcularDia({ salida: '17:00' }).estado, 'No Entrada');
