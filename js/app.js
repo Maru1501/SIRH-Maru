@@ -137,7 +137,7 @@ function vistaSemana() {
       <p class="rotulo">Esta semana</p>
       <p class="cifra">${fmtHoras(s.computadas)} <small>/ ${fmtHoras(s.meta)}</small></p>
       <div class="barra clara"><i style="width:${pctSemana}%"></i></div>
-      <p class="nota">${s.falta > 0 ? `Faltan ${fmtHoras(s.falta)}` : 'Meta cumplida'}${s.descuento ? ` · Descuento banco ${fmtHoras(s.descuento)}` : ''}${s.credito ? ` · Excedente ${fmtHoras(s.credito)}` : ''}</p>
+      <p class="nota">${s.falta > 0 ? `Faltan ${fmtHoras(s.falta)}` : 'Meta cumplida'}${s.descuento ? ` · Descuento banco ${fmtHoras(s.descuento)}` : ''}${s.credito ? ` · Excedente ${fmtHoras(s.credito)} al banco` : ''}</p>
     </div>
     <div class="tarjeta">
       <p class="rotulo">Días cumplidos</p>
@@ -164,7 +164,7 @@ function vistaSemana() {
       <div class="avisos" style="flex:1;min-width:240px">${avisos.map(([t, m]) => `<div class="av ${t}">${esc(m)}</div>`).join('')}</div>
       <div class="nota" style="text-align:right">Computadas <b>${fmtHoras(s.computadas)}</b> de ${fmtHoras(s.meta)}<br>Trabajadas reales ${fmtHoras(s.trabajadas)}</div>
     </div>
-    <p class="pie-tarjeta">Los cambios se guardan solos. Meta: 28 h (4 días de 7 h). Mínimo real de 4 h por día. Vacaciones, franco, feriado y capacitación cuentan como 7 h.</p>
+    <p class="pie-tarjeta">Los cambios se guardan solos. Meta: 28 h en 4 días. Mínimo real de 4 h por día.${CFG.excedenteSemanal ? ' Lo que pase de 28 h en la semana va al banco.' : ''} Vacaciones, franco, feriado y capacitación cuentan como 7 h.</p>
   </section>
   <div class="espacio"></div>
   <section class="grilla-2">
@@ -192,7 +192,7 @@ function vistaSemana() {
 function ayuda() {
   return `<details class="ayuda"><summary>Cómo se calculan mis horas</summary><ul>
     <li><b>Horas trabajadas</b> = salida − entrada.</li>
-    <li>Día normal: computa hasta 7 h para la semana. Lo que pase de 7 h se suma al banco.</li>
+    <li>${CFG.excedenteSemanal ? 'Día normal: suma sus horas reales a la semana. Lo que pase de 28 h en la semana se suma al banco (por ejemplo, un quinto día trabajado).' : 'Día normal: computa hasta 7 h para la semana. Lo que pase de 7 h se suma al banco.'}</li>
     <li><b>Entrada demorada</b> o <b>salida anticipada</b> (con al menos 4 h): figura Presente, computa 7 h y descuenta del banco lo que falta para 7 h.</li>
     <li><b>Trámite</b> (con al menos 4 h): computa 7 h y no descuenta del banco.</li>
     <li>Menos de 4 h trabajadas: <b>Revisar</b>, no computa ni descuenta.</li>
@@ -200,7 +200,7 @@ function ayuda() {
     <li><b>Franco</b> justifica el día (7 h), descuenta 7 h del banco de horas y suma un franco usado de los 15 del año.</li>
     <li><b>Capacitación</b>: 4 obligatorias por año, la app no deja cargar una quinta.</li>
     <li>El banco de horas va de 0 a 70 h: lo que supere 70 h se pierde y nunca queda negativo.</li>
-    <li>Meta semanal: 28 h, o sea 4 días de 7 h. Cada día computa como máximo 7 h.</li>
+    <li>Meta semanal: 28 h en 4 días, con al menos 4 h reales cada día.</li>
   </ul></details>`;
 }
 
@@ -372,7 +372,7 @@ function vistaConfig() {
     <p class="rotulo">Parámetros</p>
     <h2 style="font-size:20px;margin:6px 0 12px">Configuración fija</h2>
     <div class="parametros">
-      <div><span>Jornada estándar</span><b>7 h / día</b></div>
+      <div><span>Valor de una novedad</span><b>7 h</b></div>
       <div><span>Mínimo real trabajado</span><b>4 h / día</b></div>
       <div><span>Meta semanal</span><b>28 h</b></div>
       <div><span>Tope banco de horas</span><b>70 h</b></div>

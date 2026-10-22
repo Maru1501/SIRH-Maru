@@ -12,6 +12,9 @@ export const CONFIG_DEFAULT = {
   topeBancoMin: 70 * 60,   // tope del banco de horas
   capacitacionesAnio: 4,
   francosAnio: 15,
+  // true: cada día suma sus horas reales y al banco va lo que pase de la meta semanal.
+  // false: cada día computa hasta 7 h y al banco va lo que pase de 7 h en el día.
+  excedenteSemanal: true,
   horarioHabitual: '10:00–17:00',
 };
 
@@ -82,22 +85,23 @@ export function calcularDia(rec, cfg = CONFIG_DEFAULT) {
   }
 
   const J = cfg.jornadaMin;
-  res.credito = Math.max(0, H - J);
+  const semanal = cfg.excedenteSemanal;
+  res.credito = semanal ? 0 : Math.max(0, H - J);
 
   if (JUSTIFICA_FALTANTE.includes(novedad)) {
-    res.computadas = J;
+    res.computadas = semanal ? Math.max(H, J) : J;
     res.descuento = Math.max(0, J - H);
     res.estado = novedad === 'Entrada Demorada' ? 'Presente (demora)' : 'Presente (salida anticipada)';
     res.tono = 'ok';
   } else if (novedad === 'Trámite') {
-    res.computadas = J;
+    res.computadas = semanal ? Math.max(H, J) : J;
     res.estado = 'Presente (trámite)';
     res.tono = 'ok';
   } else {
-    res.computadas = Math.min(H, J);
+    res.computadas = semanal ? H : Math.min(H, J);
     res.estado = 'Presente';
     res.tono = 'ok';
-    if (H < J) res.avisos.push(`Faltan ${fmtHoras(J - H)} para la jornada`);
+    if (H < J && !semanal) res.avisos.push(`Faltan ${fmtHoras(J - H)} para la jornada`);
   }
   return res;
 }
@@ -129,7 +133,7 @@ export function calcularSemana(lunesIso, registros, cfg = CONFIG_DEFAULT) {
   const computadas = dias.reduce((a, d) => a + d.calc.computadas, 0);
   const trabajadas = dias.reduce((a, d) => a + (d.calc.trabajadas || 0), 0);
   const descuento = dias.reduce((a, d) => a + d.calc.descuento, 0);
-  const credito = dias.reduce((a, d) => a + d.calc.credito, 0);
+  const credito = cfg.excedenteSemanal ? Math.max(0, computadas - meta) : dias.reduce((a, d) => a + d.calc.credito, 0);
   const revisar = dias.filter(d => ['Revisar', 'No Entrada', 'No Salida', 'Revisar horario'].includes(d.calc.estado));
   const cumplidos = dias.filter(d => d.calc.computadas > 0).length;
   return { dias, meta, computadas, trabajadas, descuento, credito, revisar, cumplidos, justificados, falta: Math.max(0, meta - computadas) };
@@ -142,10 +146,18 @@ export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
     if (m.banco !== 'horas') continue;
     eventos.push({ fecha: m.fecha, orden: 0, concepto: m.concepto || 'Ajuste manual', pedido: Number(m.cantidad) || 0, manual: true, id: m.id });
   }
+  const semanas = new Set();
   for (const [fecha, rec] of Object.entries(registros || {})) {
     const c = calcularDia(rec, cfg);
+    semanas.add(iso(lunesDe(desdeIso(fecha))));
     if (c.credito > 0) eventos.push({ fecha, orden: 1, concepto: 'Excedente del día', pedido: c.credito });
     if (c.descuento > 0) eventos.push({ fecha, orden: 2, concepto: `Descuento · ${c.novedad}`, pedido: -c.descuento });
+  }
+  if (cfg.excedenteSemanal) {
+    for (const lunes of semanas) {
+      const sem = calcularSemana(lunes, registros, cfg);
+      if (sem.credito > 0) eventos.push({ fecha: iso(sumarDias(desdeIso(lunes), 4)), orden: 3, concepto: 'Excedente semanal', pedido: sem.credito });
+    }
   }
   eventos.sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.orden - b.orden);
 
