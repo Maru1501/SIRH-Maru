@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=20261023b';
-import { almacen, registroVacio } from './db.js?v=20261023b';
+} from './calc.js?v=20261023c';
+import { almacen, registroVacio } from './db.js?v=20261023c';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -197,8 +197,8 @@ function vistaSemana() {
     <div class="tarjeta lista-nov">
       <p class="rotulo">Tus novedades</p>
       <div class="item"><div><b>Vacaciones</b><span>Días disponibles</span></div><div class="val" style="${vac.saldo < 0 ? 'color:var(--rojo)' : ''}">${vac.saldo}</div></div>
-      <div class="item"><div><b>Francos</b><span>Usados en ${anio} · 7 h del banco cada uno</span></div><div class="val" style="${francos > CFG.francosAnio ? 'color:var(--rojo)' : ''}">${francos} <small>/ ${CFG.francosAnio}</small></div></div>
-      <div class="item"><div><b>Capacitación</b><span>Obligatorias en ${anio}</span></div><div class="val">${capac} <small>/ ${CFG.capacitacionesAnio}</small></div></div>
+      <div class="item"><div><b>Francos</b><span>Usados en ${anio} · no se acumulan</span></div><div class="val" style="${francos > CFG.francosAnio ? 'color:var(--rojo)' : ''}">${francos} <small>/ ${CFG.francosAnio}</small></div></div>
+      <div class="item"><div><b>Capacitación</b><span>${capac < CFG.capacitacionesAnio ? `<span style="color:var(--ocre)">${CFG.capacitacionesAnio - capac === 1 ? 'Falta 1 obligatoria' : `Faltan ${CFG.capacitacionesAnio - capac} obligatorias`} en ${anio}</span>` : `Obligatorias en ${anio}: completas`}</span></div><div class="val">${capac} <small>/ ${CFG.capacitacionesAnio}</small></div></div>
     </div>
     <div class="tarjeta">
       <p class="rotulo">Movimientos del banco</p>
@@ -381,6 +381,8 @@ function vistaVacaciones() {
   const N = ui.nov;
   const v = libroBancoVacaciones(registros, movimientos);
   const asign = movimientos.find(m => m.banco === 'vacaciones' && m.concepto === `Asignación ${N.anio}`);
+  const anterior = movimientos.find(m => m.banco === 'vacaciones' && m.concepto === 'Saldo de años anteriores');
+  const asignado = asign ? asign.cantidad : CFG.vacacionesAnio;
   const delAnio = Object.entries(registros).filter(([f]) => f.startsWith(String(N.anio)));
   const cuenta = n => delAnio.filter(([, r]) => r.novedad === n).length;
   const usadasVac = cuenta('Vacaciones'), francos = cuenta('Franco'), capac = cuenta('Capacitación');
@@ -399,8 +401,8 @@ function vistaVacaciones() {
       if (N.tipo === 'Franco') efecto = ` Francos en ${N.anio}: <b>${francos + n} de ${CFG.francosAnio}</b>. Descuenta ${fmtHoras(n * CFG.jornadaMin)} del banco.`;
       if (N.tipo === 'Capacitación') efecto = ` Capacitaciones en ${N.anio}: <b>${capac + n} de ${CFG.capacitacionesAnio}</b>.`;
       const malo = (N.tipo === 'Vacaciones' && v.saldo - n < 0) || (N.tipo === 'Capacitación' && capac + n > CFG.capacitacionesAnio) || (N.tipo === 'Franco' && francos + n > CFG.francosAnio);
-      bloqueado = N.tipo === 'Capacitación' && capac + n > CFG.capacitacionesAnio;
-      if (bloqueado) efecto += ' No se pueden cargar más de 4 por año.';
+      bloqueado = (N.tipo === 'Capacitación' && capac + n > CFG.capacitacionesAnio) || (N.tipo === 'Franco' && francos + n > CFG.francosAnio);
+      if (bloqueado) efecto += N.tipo === 'Franco' ? ' No se pueden cargar más de 15 por año.' : ' No se pueden cargar más de 4 por año.';
       preview = `<p class="av ${malo ? 'malo' : 'ok'}">${N.tipo === 'Quitar novedad' ? `Se quita la novedad de <b>${n}</b> ${n === 1 ? 'día' : 'días'}.` : `Se cargan <b>${n}</b> ${n === 1 ? 'día hábil' : 'días hábiles'} de ${N.tipo.toLowerCase()}.`}${efecto}${extra.length ? ` (${extra.join(', ')}.)` : ''}</p>`;
     }
   }
@@ -409,9 +411,11 @@ function vistaVacaciones() {
   return `
   <section class="stats-nov">
     <div class="tarjeta oscura"><p class="rotulo">Vacaciones disponibles</p><p class="cifra">${v.saldo} <small>días</small></p>
-      <p class="nota">${asign ? `${asign.cantidad} asignados en ${N.anio} · ${usadasVac} usados` : `Sin asignación para ${N.anio}`}</p></div>
-    <div class="tarjeta"><p class="rotulo">Francos ${N.anio}</p><p class="cifra">${francos} <small>/ ${CFG.francosAnio}</small></p></div>
-    <div class="tarjeta"><p class="rotulo">Capacitaciones ${N.anio}</p><p class="cifra">${capac} <small>/ ${CFG.capacitacionesAnio}</small></p></div>
+      <p class="nota">${asignado} de ${N.anio} · ${usadasVac} usados${anterior ? ` · ${anterior.cantidad} de antes` : ''}</p></div>
+    <div class="tarjeta"><p class="rotulo">Francos ${N.anio}</p><p class="cifra">${francos} <small>/ ${CFG.francosAnio}</small></p>
+      <p class="nota">Te quedan ${CFG.francosAnio - francos}. No pasan al año siguiente.</p></div>
+    <div class="tarjeta"><p class="rotulo">Capacitaciones ${N.anio}</p><p class="cifra">${capac} <small>/ ${CFG.capacitacionesAnio}</small></p>
+      ${capac < CFG.capacitacionesAnio ? `<p class="nota" style="color:var(--ocre)">${CFG.capacitacionesAnio - capac === 1 ? 'Falta 1 obligatoria' : `Faltan ${CFG.capacitacionesAnio - capac} obligatorias`}</p>` : ''}</div>
   </section>
   <div class="espacio"></div>
   <section class="tarjeta">
@@ -429,10 +433,15 @@ function vistaVacaciones() {
   <section class="grilla-2-par">
     <div class="tarjeta">
       <p class="rotulo">Vacaciones del año</p>
-      <h2 style="font-size:18px;margin:6px 0 10px">Días hábiles que te corresponden en ${N.anio}</h2>
+      <p class="nota" style="margin:6px 0 10px">Cada 1 de enero se suman <b>${CFG.vacacionesAnio} días hábiles</b> y lo que no usaste se acumula. Si este año te corresponden otros días, cambialo acá.</p>
       <div class="form-fila" style="grid-template-columns:1fr auto">
-        <input class="campo" type="number" id="n-asign" min="0" step="1" value="${asign ? asign.cantidad : ''}" placeholder="Ej: 30" aria-label="Días de vacaciones ${N.anio}">
-        <button class="boton principal" data-accion="asignar-vac">Guardar</button>
+        <input class="campo" type="number" id="n-asign" min="0" step="1" value="${asign ? asign.cantidad : CFG.vacacionesAnio}" aria-label="Días de vacaciones ${N.anio}">
+        <button class="boton" data-accion="asignar-vac">Guardar ${N.anio}</button>
+      </div>
+      <p class="nota" style="margin:14px 0 6px">¿Traés días sin usar de antes de usar la app?</p>
+      <div class="form-fila" style="grid-template-columns:1fr auto">
+        <input class="campo" type="number" id="n-anterior" step="1" value="${anterior ? anterior.cantidad : ''}" placeholder="Ej: 5" aria-label="Días que traés de años anteriores">
+        <button class="boton" data-accion="vac-anterior">Guardar</button>
       </div>
     </div>
     <div class="tarjeta">
@@ -491,17 +500,23 @@ function vistaConfig() {
 }
 
 // ---------- acciones ----------
-function capacitacionesDeMas(cambios) {
+// Topes por año: 4 capacitaciones y 15 francos (no se acumulan de un año al otro).
+const TOPES = { 'Capacitación': ['capacitacionesAnio', 'capacitaciones'], 'Franco': ['francosAnio', 'francos'] };
+function excedeTope(cambios) {
   const todos = { ...almacen.datos.registros, ...cambios };
-  const porAnio = {};
-  for (const [f, r] of Object.entries(todos)) if (r && r.novedad === 'Capacitación') porAnio[f.slice(0, 4)] = (porAnio[f.slice(0, 4)] || 0) + 1;
-  const anios = new Set(Object.entries(cambios).filter(([, r]) => r && r.novedad === 'Capacitación').map(([f]) => f.slice(0, 4)));
-  return [...anios].find(a => porAnio[a] > CFG.capacitacionesAnio);
+  for (const [nov, [clave, nombre]] of Object.entries(TOPES)) {
+    const porAnio = {};
+    for (const [f, r] of Object.entries(todos)) if (r && r.novedad === nov) porAnio[f.slice(0, 4)] = (porAnio[f.slice(0, 4)] || 0) + 1;
+    const anios = new Set(Object.entries(cambios).filter(([, r]) => r && r.novedad === nov).map(([f]) => f.slice(0, 4)));
+    const anio = [...anios].find(a => porAnio[a] > CFG[clave]);
+    if (anio) return `Ya hay ${CFG[clave]} ${nombre} en ${anio}. No se puede cargar otro día.`;
+  }
+  return null;
 }
 
 async function guardar(cambios, okMsg) {
-  const anio = capacitacionesDeMas(cambios);
-  if (anio) { toast(`Ya hay ${CFG.capacitacionesAnio} capacitaciones en ${anio}. No se puede cargar otra.`, true); return false; }
+  const tope = excedeTope(cambios);
+  if (tope) { toast(tope, true); return false; }
   try { await almacen.guardarRegistros(cambios); if (okMsg) toast(okMsg); }
   catch (e) { toast(e.message, true); }
   return true;
@@ -614,8 +629,20 @@ document.addEventListener('click', async ev => {
       const concepto = `Asignación ${ui.nov.anio}`;
       try {
         for (const m of almacen.datos.movimientos.filter(m => m.banco === 'vacaciones' && m.concepto === concepto)) await almacen.borrarMovimiento(m.id);
-        if (dias > 0) await almacen.agregarMovimiento({ fecha: `${ui.nov.anio}-01-01`, banco: 'vacaciones', cantidad: dias, concepto });
+        if (dias !== CFG.vacacionesAnio) await almacen.agregarMovimiento({ fecha: `${ui.nov.anio}-01-01`, banco: 'vacaciones', cantidad: dias, concepto });
         toast(`${ui.nov.anio}: ${dias} días de vacaciones`);
+      } catch (e) { toast(e.message, true); }
+      render(); break;
+    }
+    case 'vac-anterior': {
+      const txt = $('#n-anterior').value, dias = Number(txt);
+      if (txt !== '' && !Number.isFinite(dias)) { toast('Indicá la cantidad de días', true); break; }
+      const concepto = 'Saldo de años anteriores';
+      const primerAnio = Math.min(new Date().getFullYear(), ...Object.keys(almacen.datos.registros).map(f => +f.slice(0, 4)));
+      try {
+        for (const m of almacen.datos.movimientos.filter(m => m.banco === 'vacaciones' && m.concepto === concepto)) await almacen.borrarMovimiento(m.id);
+        if (dias) await almacen.agregarMovimiento({ fecha: `${primerAnio}-01-01`, banco: 'vacaciones', cantidad: dias, concepto });
+        toast(dias ? `Sumados ${dias} días de años anteriores` : 'Saldo anterior quitado');
       } catch (e) { toast(e.message, true); }
       render(); break;
     }

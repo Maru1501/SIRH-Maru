@@ -12,6 +12,7 @@ export const CONFIG_DEFAULT = {
   topeBancoMin: 70 * 60,   // tope del banco de horas
   capacitacionesAnio: 4,
   francosAnio: 15,
+  vacacionesAnio: 30, // se suman cada 1/1 y lo que sobra se acumula
   // true: cada día trabajado suma sus horas reales − 7 h al saldo de la semana; si queda positivo va al banco.
   // false: cada día computa hasta 7 h y al banco va lo que pase de 7 h en el día.
   excedenteSemanal: true,
@@ -184,8 +185,17 @@ export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
 }
 
 // Libro del banco de vacaciones (en días)
-export function libroBancoVacaciones(registros, movimientos) {
+export function libroBancoVacaciones(registros, movimientos, cfg = CONFIG_DEFAULT, hoy = new Date()) {
   const eventos = [];
+  // Asignación automática cada 1/1, desde el primer año con datos hasta el año actual.
+  // Una "Asignación AAAA" cargada a mano reemplaza la automática de ese año.
+  const manuales = new Set((movimientos || []).filter(m => m.banco === 'vacaciones' && /^Asignación \d{4}$/.test(m.concepto || '')).map(m => m.concepto.slice(-4)));
+  const anios = [...Object.keys(registros || {}), ...(movimientos || []).map(m => m.fecha)].map(f => +f.slice(0, 4));
+  const ultimo = Math.max(hoy.getFullYear(), ...anios);
+  for (let a = Math.min(hoy.getFullYear(), ...anios); a <= ultimo; a++) {
+    if (a > hoy.getFullYear() && !anios.includes(a)) continue;
+    if (!manuales.has(String(a))) eventos.push({ fecha: `${a}-01-01`, orden: 0, concepto: `Asignación ${a}`, dias: cfg.vacacionesAnio, auto: true });
+  }
   for (const m of movimientos || []) {
     if (m.banco !== 'vacaciones') continue;
     eventos.push({ fecha: m.fecha, orden: 0, concepto: m.concepto || 'Ajuste manual', dias: Number(m.cantidad) || 0, manual: true, id: m.id });

@@ -24,8 +24,8 @@ caso('10 a 13 (3 h) → Revisar', () => {
 });
 caso('Vacaciones → −1 día', () => {
   const regs = { '2026-03-02': { novedad: 'Vacaciones' } };
-  const v = libroBancoVacaciones(regs, [{ banco: 'vacaciones', fecha: '2026-01-01', cantidad: 10 }]);
-  assert.equal(v.saldo, 9);
+  const v = libroBancoVacaciones(regs, [], undefined, new Date(2026, 9, 23));
+  assert.equal(v.saldo, 29);
   const c = calcularDia(regs['2026-03-02']); assert.equal(c.computadas, h(7)); assert.equal(c.descuento, 0); assert.match(c.estado, /^Presente/);
 });
 caso('Banco 68 h + 5 h → 70, 3 h perdidas', () => {
@@ -93,6 +93,15 @@ caso('Salida 19:35 cuenta hasta las 19:00', () => {
 caso('Home office: registra el día, no suma horas ni banco', () => {
   const c = calcularDia({ novedad: 'Home office' });
   assert.equal(c.computadas, 0); assert.equal(c.descuento, 0); assert.equal(c.estado, 'Presente (home office)');
+});
+caso('Vacaciones: +30 cada 1/1 y se acumulan (5 que sobran + 30 = 35)', () => {
+  const regs = {};
+  for (let d = 1; d <= 25; d++) { const f = `2026-03-${String(d).padStart(2, '0')}`; const w = new Date(2026, 2, d).getDay(); if (w && w < 6) regs[f] = { novedad: 'Vacaciones' }; }
+  const usados = Object.keys(regs).length; // 18 días hábiles
+  const v26 = libroBancoVacaciones(regs, [{ banco: 'vacaciones', fecha: '2026-01-01', cantidad: 5 - (30 - usados) + 0, concepto: 'Ajuste' }], undefined, new Date(2026, 11, 31));
+  assert.equal(v26.saldo, 5);
+  const v27 = libroBancoVacaciones(regs, [{ banco: 'vacaciones', fecha: '2026-01-01', cantidad: 5 - (30 - usados), concepto: 'Ajuste' }], undefined, new Date(2027, 0, 2));
+  assert.equal(v27.saldo, 35);
 });
 caso('Falta una hora → No Entrada / No Salida', () => {
   assert.equal(calcularDia({ salida: '17:00' }).estado, 'No Entrada');
