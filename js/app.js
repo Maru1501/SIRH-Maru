@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=20261023c';
-import { almacen, registroVacio } from './db.js?v=20261023c';
+} from './calc.js?v=20261023d';
+import { almacen, registroVacio } from './db.js?v=20261023d';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -186,11 +186,12 @@ function vistaSemana() {
       const primero = s.dias.find(d => !diaCompleto(d.rec, d.calc))?.fecha;
       return s.dias.map(d => filaDia(d.fecha, d.rec, d.calc, { plegarVacio: d.fecha !== primero })).join('');
     })()}</div>
-    <div class="resumen">
-      <div class="avisos" style="flex:1;min-width:240px">${avisos.map(([t, m]) => `<div class="av ${t}">${esc(m)}</div>`).join('')}</div>
-      <div class="nota" style="text-align:right">Trabajadas reales <b>${fmtHoras(s.trabajadas)}</b><br>Saldo de la semana ${s.saldo === 0 ? '0 h' : fmtHoras(s.saldo, { signo: true })}</div>
-    </div>
-    <p class="pie-tarjeta">Los cambios se guardan solos. Meta: 4 días de 7 h. Cada día trabajado suma o resta contra 7 h (mínimo real 4 h). Si la semana queda a favor, va al banco. Vacaciones, franco, feriado y capacitación cuentan como 7 h; home office solo registra el día.</p>
+    ${avisos.length ? `<div class="avisos" style="padding-top:14px">${avisos.map(([t, m]) => `<div class="av ${t}">${esc(m)}</div>`).join('')}</div>` : ''}
+    <details class="ayuda detalle-semana">
+      <summary>Detalles de la semana</summary>
+      <p style="margin-top:8px">Trabajadas reales <b>${fmtHoras(s.trabajadas)}</b> · Saldo de la semana <b>${s.saldo === 0 ? '0 h' : fmtHoras(s.saldo, { signo: true })}</b></p>
+      <p class="pie-tarjeta" style="margin-top:6px">Los cambios se guardan solos. Meta: 4 días de 7 h. Cada día trabajado suma o resta contra 7 h (mínimo real 4 h). Si la semana queda a favor, va al banco. Vacaciones, franco, feriado y capacitación cuentan como 7 h; home office solo registra el día.</p>
+    </details>
   </section>
   <div class="espacio"></div>
   <section class="grilla-2">
