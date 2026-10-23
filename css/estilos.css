@@ -157,9 +157,13 @@ select.campo { padding-right: 6px; }
 .av.malo { background: var(--rojo-claro); color: var(--rojo); }
 .cifra.saldo.neg { color: var(--rojo); }
 .cifra.saldo.pos { color: var(--verde-texto); }
+.stats-nov { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; }
+.stats-nov .cifra { font-size: 28px; }
 .meta-banner { margin: 0 0 12px; font-weight: 600; font-size: 14px; }
 .av.malo.cifra.saldo.neg { color: var(--rojo); }
 .cifra.saldo.pos { color: var(--verde-texto); }
+.stats-nov { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; }
+.stats-nov .cifra { font-size: 28px; }
 .meta-banner { background: #f6d5d1; }
 .pie-tarjeta { font-size: 12px; color: var(--texto-3); margin-top: 14px; }
 
@@ -225,6 +229,11 @@ ol.pasos { padding-left: 20px; margin: 4px 0; display: grid; gap: 4px; }
   .stats { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 760px) {
+  .stats-nov { gap: 8px; }
+  .stats-nov .tarjeta { padding: 10px; }
+  .stats-nov .rotulo { font-size: 9.5px; letter-spacing: .06em; }
+  .stats-nov .cifra { font-size: 20px; margin: 6px 0 2px; }
+  .stats-nov .nota { font-size: 11px; }
   .pagina { padding: 18px 16px 32px; }
   h1 { font-size: 25px; }
   .tarjeta { padding: 16px; }

@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=20261023a';
-import { almacen, registroVacio } from './db.js?v=20261023a';
+} from './calc.js?v=20261023b';
+import { almacen, registroVacio } from './db.js?v=20261023b';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -26,6 +26,7 @@ const ui = {
   borrador: {},
   rango: { desde: '', hasta: '', entrada: '', salida: '', novedad: 'Sin novedad', soloVacios: true },
   anioBanco: 'todos',
+  nov: { anio: new Date().getFullYear(), tipo: 'Vacaciones', desde: '', hasta: '' },
   abiertos: new Set(), // días cargados que se abrieron para editar (en el celular)
 };
 
@@ -40,7 +41,7 @@ function render() {
   const foco = document.activeElement;
   const clave = foco && foco.dataset && foco.dataset.campo ? `[data-fecha="${foco.closest('[data-fecha]')?.dataset.fecha}"] [data-campo="${foco.dataset.campo}"]` : foco?.id ? `#${foco.id}` : null;
   $$('.menu-lateral button[data-vista]').forEach(b => b.classList.toggle('activa', b.dataset.vista === ui.vista));
-  $('#vista-actual').textContent = { semana: 'Semana', anual: 'Carga anual', banco: 'Banco de horas', vacaciones: 'Vacaciones', config: 'Configuración' }[ui.vista];
+  $('#vista-actual').textContent = { semana: 'Semana', anual: 'Carga anual', banco: 'Banco de horas', vacaciones: 'Novedades', config: 'Configuración' }[ui.vista];
   const v = $('#vista');
   v.innerHTML = { semana: vistaSemana, anual: vistaAnual, banco: vistaBanco, vacaciones: vistaVacaciones, config: vistaConfig }[ui.vista]();
   if (clave) { const el = $(clave); if (el && el !== document.body) el.focus({ preventScroll: true }); }
@@ -336,38 +337,112 @@ function vistaBanco() {
 }
 
 // ---------- Vacaciones ----------
+const NOV_PERIODO = ['Vacaciones', 'Franco', 'Capacitación', 'Feriado', 'Home office'];
+
+function diasHabiles(desde, hasta) {
+  const out = [];
+  if (!desde || !hasta || hasta < desde) return out;
+  for (let d = desdeIso(desde); iso(d) <= hasta; d = sumarDias(d, 1)) { const w = d.getDay(); if (w >= 1 && w <= 5) out.push(iso(d)); }
+  return out;
+}
+
+// Agrupa días hábiles seguidos con la misma novedad de día completo
+function periodosDelAnio(registros, anio) {
+  const fechas = Object.keys(registros).filter(f => f.startsWith(String(anio)) && NOV_PERIODO.includes(registros[f].novedad)).sort();
+  const out = [];
+  for (const f of fechas) {
+    const nov = registros[f].novedad, ult = out[out.length - 1];
+    let sig = ult && sumarDias(desdeIso(ult.hasta), 1);
+    while (sig && (sig.getDay() === 0 || sig.getDay() === 6)) sig = sumarDias(sig, 1);
+    if (ult && ult.novedad === nov && iso(sig) === f) { ult.hasta = f; ult.dias++; }
+    else out.push({ novedad: nov, desde: f, hasta: f, dias: 1 });
+  }
+  return out;
+}
+
+function planPeriodo() {
+  const { registros } = almacen.datos;
+  const N = ui.nov;
+  const quitar = N.tipo === 'Quitar novedad';
+  const plan = { dias: [], reemplaza: 0, feriados: 0, sinCambio: 0 };
+  for (const f of diasHabiles(N.desde, N.hasta)) {
+    const r = registros[f];
+    if (quitar) { if (r && NOV_PERIODO.includes(r.novedad)) plan.dias.push(f); else plan.sinCambio++; continue; }
+    if (r && r.novedad === N.tipo) { plan.sinCambio++; continue; }
+    if (N.tipo === 'Vacaciones' && r && r.novedad === 'Feriado') { plan.feriados++; continue; }
+    if (!registroVacio(r)) plan.reemplaza++;
+    plan.dias.push(f);
+  }
+  return plan;
+}
+
 function vistaVacaciones() {
   const { registros, movimientos } = almacen.datos;
+  const N = ui.nov;
   const v = libroBancoVacaciones(registros, movimientos);
-  const lista = v.eventos.slice().reverse();
+  const asign = movimientos.find(m => m.banco === 'vacaciones' && m.concepto === `Asignación ${N.anio}`);
+  const delAnio = Object.entries(registros).filter(([f]) => f.startsWith(String(N.anio)));
+  const cuenta = n => delAnio.filter(([, r]) => r.novedad === n).length;
+  const usadasVac = cuenta('Vacaciones'), francos = cuenta('Franco'), capac = cuenta('Capacitación');
+  const plan = planPeriodo();
+  const n = plan.dias.length;
+  let preview = '', bloqueado = false;
+  if (N.desde && N.hasta) {
+    if (N.hasta < N.desde) preview = '<p class="av malo">La fecha "hasta" tiene que ser igual o posterior a "desde".</p>';
+    else {
+      const extra = [];
+      if (plan.reemplaza) extra.push(`${plan.reemplaza} ya ${plan.reemplaza === 1 ? 'tenía' : 'tenían'} algo cargado y se reemplaza`);
+      if (plan.feriados) extra.push(`${plan.feriados} ${plan.feriados === 1 ? 'feriado queda' : 'feriados quedan'} como feriado`);
+      if (plan.sinCambio) extra.push(`${plan.sinCambio} sin cambios`);
+      let efecto = '';
+      if (N.tipo === 'Vacaciones') efecto = ` Te quedarían <b>${v.saldo - n}</b> días de vacaciones.`;
+      if (N.tipo === 'Franco') efecto = ` Francos en ${N.anio}: <b>${francos + n} de ${CFG.francosAnio}</b>. Descuenta ${fmtHoras(n * CFG.jornadaMin)} del banco.`;
+      if (N.tipo === 'Capacitación') efecto = ` Capacitaciones en ${N.anio}: <b>${capac + n} de ${CFG.capacitacionesAnio}</b>.`;
+      const malo = (N.tipo === 'Vacaciones' && v.saldo - n < 0) || (N.tipo === 'Capacitación' && capac + n > CFG.capacitacionesAnio) || (N.tipo === 'Franco' && francos + n > CFG.francosAnio);
+      bloqueado = N.tipo === 'Capacitación' && capac + n > CFG.capacitacionesAnio;
+      if (bloqueado) efecto += ' No se pueden cargar más de 4 por año.';
+      preview = `<p class="av ${malo ? 'malo' : 'ok'}">${N.tipo === 'Quitar novedad' ? `Se quita la novedad de <b>${n}</b> ${n === 1 ? 'día' : 'días'}.` : `Se cargan <b>${n}</b> ${n === 1 ? 'día hábil' : 'días hábiles'} de ${N.tipo.toLowerCase()}.`}${efecto}${extra.length ? ` (${extra.join(', ')}.)` : ''}</p>`;
+    }
+  }
+  const periodos = periodosDelAnio(registros, N.anio).reverse();
+  const anios = []; for (let a = new Date().getFullYear() - 1; a <= new Date().getFullYear() + 1; a++) anios.push(a);
   return `
-  <section class="grilla-2-par">
-    <div class="tarjeta oscura">
-      <p class="rotulo">Días de vacaciones disponibles</p>
-      <p class="cifra" style="font-size:40px">${v.saldo} <small>${Math.abs(v.saldo) === 1 ? 'día' : 'días'}</small></p>
-      <p class="nota">Cada jornada cargada como Vacaciones descuenta 1 día.</p>
-      ${v.saldo < 0 ? '<p class="alerta-tope">Usaste más días de los asignados. Revisá la asignación.</p>' : ''}
-    </div>
-    <div class="tarjeta">
-      <p class="rotulo">Asignar o corregir días</p>
-      <p class="nota" style="margin:6px 0 12px">Por ejemplo, los días que te corresponden en el año. Para restar, poné un número negativo.</p>
-      <div class="form-fila">
-        <label>Fecha<input class="campo" type="date" id="v-fecha" value="${new Date().getFullYear()}-01-01"></label>
-        <label>Días<input class="campo" type="number" id="v-dias" step="1" placeholder="Ej: 14"></label>
-        <label style="grid-column:span 2">Concepto<input class="campo" type="text" id="v-concepto" placeholder="Vacaciones ${new Date().getFullYear()}" maxlength="120"></label>
-        <button class="boton principal" data-accion="agregar-vac">Agregar</button>
-      </div>
-    </div>
+  <section class="stats-nov">
+    <div class="tarjeta oscura"><p class="rotulo">Vacaciones disponibles</p><p class="cifra">${v.saldo} <small>días</small></p>
+      <p class="nota">${asign ? `${asign.cantidad} asignados en ${N.anio} · ${usadasVac} usados` : `Sin asignación para ${N.anio}`}</p></div>
+    <div class="tarjeta"><p class="rotulo">Francos ${N.anio}</p><p class="cifra">${francos} <small>/ ${CFG.francosAnio}</small></p></div>
+    <div class="tarjeta"><p class="rotulo">Capacitaciones ${N.anio}</p><p class="cifra">${capac} <small>/ ${CFG.capacitacionesAnio}</small></p></div>
   </section>
   <div class="espacio"></div>
   <section class="tarjeta">
-    <p class="rotulo">Historial</p><h2 style="font-size:20px;margin:6px 0 12px">Banco de vacaciones</h2>
-    ${lista.length ? `<div class="tabla-scroll"><table class="historial">
-      <thead><tr><th>Fecha</th><th>Concepto</th><th class="der">Días</th><th class="der">Saldo</th><th></th></tr></thead>
-      <tbody>${lista.map(e => `<tr><td>${fechaCorta(e.fecha)}</td><td>${esc(e.concepto)}</td>
-        <td class="der num ${e.dias < 0 ? 'neg' : 'pos'}">${e.dias > 0 ? '+' : e.dias < 0 ? '−' : ''}${Math.abs(e.dias)}</td><td class="der">${e.saldo}</td>
-        <td class="der">${e.manual ? `<button class="enlace" data-borrar-mov="${e.id}" title="Borrar movimiento">✕</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`
-      : '<p class="vacio-msg">Todavía no hay movimientos. Empezá asignando los días del año.</p>'}
+    <div class="bloque-cab"><div><p class="rotulo">Cargar un período</p><h2>Novedades por fecha</h2></div>
+      <select class="campo" id="n-anio" style="width:auto" aria-label="Año">${anios.map(a => `<option${a === N.anio ? ' selected' : ''}>${a}</option>`).join('')}</select></div>
+    <div class="form-fila">
+      <label>Novedad<select class="campo" id="n-tipo">${[...NOV_PERIODO, 'Quitar novedad'].map(t => `<option${t === N.tipo ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>Desde<input class="campo" type="date" id="n-desde" value="${N.desde}"></label>
+      <label>Hasta<input class="campo" type="date" id="n-hasta" value="${N.hasta}"></label>
+      <button class="boton principal" data-accion="cargar-periodo"${n && !bloqueado ? '' : ' disabled'}>${N.tipo === 'Quitar novedad' ? 'Quitar' : 'Cargar'}</button>
+    </div>
+    <div style="margin-top:10px">${preview || '<p class="nota">Elegí la novedad y el rango. Se cargan solo los días hábiles (lunes a viernes) y cada día queda marcado en la semana.</p>'}</div>
+  </section>
+  <div class="espacio"></div>
+  <section class="grilla-2-par">
+    <div class="tarjeta">
+      <p class="rotulo">Vacaciones del año</p>
+      <h2 style="font-size:18px;margin:6px 0 10px">Días hábiles que te corresponden en ${N.anio}</h2>
+      <div class="form-fila" style="grid-template-columns:1fr auto">
+        <input class="campo" type="number" id="n-asign" min="0" step="1" value="${asign ? asign.cantidad : ''}" placeholder="Ej: 30" aria-label="Días de vacaciones ${N.anio}">
+        <button class="boton principal" data-accion="asignar-vac">Guardar</button>
+      </div>
+    </div>
+    <div class="tarjeta">
+      <p class="rotulo">Períodos cargados en ${N.anio}</p>
+      ${periodos.length ? `<table class="historial" style="margin-top:6px"><tbody>${periodos.map(p => `<tr>
+        <td><b>${p.novedad}</b><span class="sub" style="color:var(--texto-2)">${p.desde === p.hasta ? fechaCorta(p.desde) : `${fechaCorta(p.desde)} al ${fechaCorta(p.hasta)}`}</span></td>
+        <td class="der">${p.dias} ${p.dias === 1 ? 'día' : 'días'}</td>
+        <td class="der"><button class="enlace" data-quitar-periodo="${p.desde}|${p.hasta}|${p.novedad}" title="Quitar este período">✕</button></td></tr>`).join('')}</tbody></table>`
+      : '<p class="vacio-msg">Todavía no cargaste períodos este año.</p>'}
+    </div>
   </section>`;
 }
 
@@ -470,6 +545,13 @@ document.addEventListener('click', async ev => {
   if (t.id === 'btn-cerrar-menu') return menu(false);
   if (t.dataset.vista) { menu(false); ui.vista = t.dataset.vista; render(); window.scrollTo({ top: 0 }); return; }
   if (t.dataset.ir) { ui.vista = t.dataset.ir; render(); window.scrollTo({ top: 0 }); return; }
+  if (t.dataset.quitarPeriodo) {
+    const [desde, hasta, nov] = t.dataset.quitarPeriodo.split('|');
+    const dias = diasHabiles(desde, hasta).filter(f => almacen.datos.registros[f]?.novedad === nov);
+    if (!confirm(`¿Quitar ${nov.toLowerCase()} del ${fechaCorta(desde)} al ${fechaCorta(hasta)} (${dias.length} días)?`)) return;
+    const cambios = Object.fromEntries(dias.map(f => { const r = almacen.datos.registros[f]; return [f, { ...r, novedad: 'Sin novedad' }]; }));
+    await guardar(cambios, 'Período quitado'); render(); return;
+  }
   if (t.dataset.borrarMov) {
     if (!confirm('¿Borrar este movimiento?')) return;
     try { await almacen.borrarMovimiento(t.dataset.borrarMov); toast('Movimiento borrado'); } catch (e) { toast(e.message, true); }
@@ -526,12 +608,30 @@ document.addEventListener('click', async ev => {
       catch (e) { toast(e.message, true); }
       render(); break;
     }
-    case 'agregar-vac': {
-      const dias = Number($('#v-dias').value);
-      const fecha = $('#v-fecha').value;
-      if (!fecha || !Number.isFinite(dias) || dias === 0) { toast('Indicá la fecha y la cantidad de días', true); break; }
-      try { await almacen.agregarMovimiento({ fecha, banco: 'vacaciones', cantidad: dias, concepto: $('#v-concepto').value.trim() || `Vacaciones ${fecha.slice(0, 4)}` }); toast('Días agregados'); }
-      catch (e) { toast(e.message, true); }
+    case 'asignar-vac': {
+      const dias = Number($('#n-asign').value);
+      if (!Number.isFinite(dias) || dias < 0 || $('#n-asign').value === '') { toast('Indicá la cantidad de días', true); break; }
+      const concepto = `Asignación ${ui.nov.anio}`;
+      try {
+        for (const m of almacen.datos.movimientos.filter(m => m.banco === 'vacaciones' && m.concepto === concepto)) await almacen.borrarMovimiento(m.id);
+        if (dias > 0) await almacen.agregarMovimiento({ fecha: `${ui.nov.anio}-01-01`, banco: 'vacaciones', cantidad: dias, concepto });
+        toast(`${ui.nov.anio}: ${dias} días de vacaciones`);
+      } catch (e) { toast(e.message, true); }
+      render(); break;
+    }
+    case 'cargar-periodo': {
+      const plan = planPeriodo();
+      const tipo = ui.nov.tipo, quitar = tipo === 'Quitar novedad';
+      if (!plan.dias.length) break;
+      if (plan.reemplaza && !confirm(`${plan.reemplaza} de esos días ya tienen horarios u otra novedad. ¿Los reemplazo por ${tipo.toLowerCase()}?`)) break;
+      const cambios = {};
+      for (const f of plan.dias) {
+        const r = almacen.datos.registros[f] || {};
+        cambios[f] = quitar ? { entrada: r.entrada || '', salida: r.salida || '', novedad: 'Sin novedad', nota: r.nota || '' }
+          : { entrada: '', salida: '', novedad: tipo, nota: r.nota || '' };
+      }
+      t.disabled = true;
+      if (await guardar(cambios, quitar ? `Novedad quitada de ${plan.dias.length} días` : `${plan.dias.length} días de ${tipo.toLowerCase()} cargados`)) { ui.nov.desde = ''; ui.nov.hasta = ''; }
       render(); break;
     }
     case 'conectar': {
@@ -556,6 +656,12 @@ document.addEventListener('change', async ev => {
   if (el.id === 'sel-anio') { ui.anio = +el.value; return render(); }
   if (el.id === 'sel-mes') { ui.mes = el.value === 'todos' ? 'todos' : +el.value; return render(); }
   if (el.id === 'sel-anio-banco') { ui.anioBanco = el.value; return render(); }
+  if (el.id === 'n-anio') { ui.nov.anio = +el.value; return render(); }
+  if (['n-tipo', 'n-desde', 'n-hasta'].includes(el.id)) {
+    ui.nov[el.id.slice(2)] = el.value;
+    if (el.id === 'n-desde' && el.value && (!ui.nov.hasta || ui.nov.hasta < el.value)) ui.nov.hasta = el.value;
+    return render();
+  }
   if (el.id && el.id.startsWith('r-')) {
     const k = { 'r-desde': 'desde', 'r-hasta': 'hasta', 'r-entrada': 'entrada', 'r-salida': 'salida', 'r-novedad': 'novedad', 'r-vacios': 'soloVacios' }[el.id];
     if (k) ui.rango[k] = el.type === 'checkbox' ? el.checked : el.value;
