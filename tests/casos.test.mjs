@@ -29,9 +29,7 @@ caso('Vacaciones → −1 día', () => {
   const c = calcularDia(regs['2026-03-02']); assert.equal(c.computadas, h(7)); assert.equal(c.descuento, 0); assert.match(c.estado, /^Presente/);
 });
 caso('Banco 68 h + 5 h → 70, 3 h perdidas', () => {
-  const regs = {}; // semana de 33 h → +5 h
-  for (const f of ['2026-03-02', '2026-03-03', '2026-03-04', '2026-03-05']) regs[f] = { entrada: '10:00', salida: '17:00' };
-  regs['2026-03-06'] = { entrada: '10:00', salida: '15:00' };
+  const regs = { '2026-03-02': { entrada: '07:00', salida: '19:00' } }; // 12 h → +5 h
   const b = libroBancoHoras(regs, [{ banco: 'horas', fecha: '2026-01-01', cantidad: h(68) }]);
   assert.equal(b.saldo, h(70)); assert.equal(b.perdidas, h(3));
 });
@@ -40,10 +38,20 @@ caso('Horas reales: Lun 9 + Mar 8 + Mié 6 + Jue 5 = 28 → cumplida, sin banco'
     '2026-10-21': { entrada: '10:00', salida: '16:00' }, '2026-10-22': { entrada: '10:00', salida: '15:00' } };
   const s = calcularSemana('2026-10-19', regs); assert.equal(s.computadas, h(28)); assert.equal(s.falta, 0); assert.equal(s.credito, 0);
 });
-caso('Quinto día trabajado va entero al banco', () => {
-  const regs = {};
-  for (const f of ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23']) regs[f] = { entrada: '10:00', salida: '17:00' };
-  assert.equal(libroBancoHoras(regs, []).saldo, h(7));
+caso('Saldo día a día: Lun 9-15, Mar 9-15, Mié 9-19', () => {
+  const regs = { '2026-10-19': { entrada: '09:00', salida: '15:00' } };
+  assert.equal(calcularSemana('2026-10-19', regs).saldo, -h(1));
+  regs['2026-10-20'] = { entrada: '09:00', salida: '15:00' };
+  assert.equal(calcularSemana('2026-10-19', regs).saldo, -h(2));
+  regs['2026-10-21'] = { entrada: '09:00', salida: '19:00' };
+  assert.equal(calcularSemana('2026-10-19', regs).saldo, h(1));
+});
+caso('Semana de Maru: 2 vacaciones + 9:30 + 8:30 + home office → acumula 4 h', () => {
+  const regs = { '2026-10-19': { novedad: 'Vacaciones' }, '2026-10-20': { novedad: 'Vacaciones' },
+    '2026-10-21': { entrada: '09:25', salida: '18:55' }, '2026-10-22': { entrada: '10:30', salida: '19:20' }, '2026-10-23': { novedad: 'Home office' } };
+  const s = calcularSemana('2026-10-19', regs);
+  assert.equal(s.trabajadas, h(18)); assert.equal(s.saldo, h(4)); assert.equal(s.faltanDias, 0);
+  assert.equal(libroBancoHoras(regs, []).saldo, h(4));
 });
 caso('Modo diario (tope 7 h/día) sigue disponible', () => {
   const cfg = { ...CONFIG_DEFAULT, excedenteSemanal: false };

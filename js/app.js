@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=20261022e';
-import { almacen, registroVacio } from './db.js?v=20261022e';
+} from './calc.js?v=20261023a';
+import { almacen, registroVacio } from './db.js?v=20261023a';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -63,6 +63,7 @@ const opcionesNovedad = sel => NOVEDADES.map(n => `<option${n === sel ? ' select
 function celdaBanco(c) {
   if (c.descuento > 0) return `<span class="num neg">${fmtHoras(-c.descuento)}</span>`;
   if (c.credito > 0) return `<span class="num pos">${fmtHoras(c.credito, { signo: true })}</span>`;
+  if (c.diferencia) return `<span class="num ${c.diferencia < 0 ? 'neg' : 'pos'}">${fmtHoras(c.diferencia, { signo: true })}</span>`;
   return `<span class="num gris">—</span>`;
 }
 
@@ -78,8 +79,10 @@ function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
   const resumen = plegada ? `<button class="res-dia" data-abrir="${fecha}" aria-label="Editar ${nombreDia(fecha)} ${dd_mm(fecha)}">
       <span class="rd-dia">${DIAS_C[desdeIso(fecha).getDay()]} ${dd_mm(fecha)}${hoy ? ' <span class="etq">HOY</span>' : ''}</span>
       <span class="rd-det">${esc(detalle)}${r.nota ? ' · ' + esc(r.nota) : ''}</span>
-      <span class="rd-h num">${fmtHoras(c.justificado ? c.computadas : c.trabajadas || null)}</span>
-      <span class="estado ${c.tono}">${esc((c.estado || '').replace(/^Presente \((.*)\)$/, '$1').replace(/^./, x => x.toUpperCase()))}</span>
+      <span class="rd-h num">${fmtHoras(c.justificado ? null : c.trabajadas || null)}</span>
+      ${c.diferencia !== undefined && c.tono === 'ok'
+        ? `<span class="estado ${c.diferencia < 0 ? 'malo' : 'ok'}">${c.diferencia === 0 ? '0 h' : fmtHoras(c.diferencia, { signo: true })}</span>`
+        : `<span class="estado ${c.tono}">${esc((c.estado || '').replace(/^Presente \((.*)\)$/, '$1').replace(/^./, x => x.toUpperCase()))}</span>`}
     </button>` : '';
   const listo = !plegada && (completo || ui.abiertos.has(fecha)) ? `<div class="c-listo"><button class="boton" data-cerrar="${fecha}">Listo ✓</button></div>` : '';
   return `<div class="fila${hoy ? ' hoy' : ''}${sucia ? ' sucia' : ''}${plegada ? ' plegada' : ''}" data-fecha="${fecha}">${resumen}
@@ -90,14 +93,14 @@ function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
     <div class="c-nota"><span class="lbl-movil">Nota</span><input class="campo" type="text" data-campo="nota" value="${esc(r.nota)}" placeholder="Nota" maxlength="200" aria-label="Nota ${fecha}"></div>
     <div class="c-trab"><span class="lbl-movil">Trabajadas</span><span class="num ${c.trabajadas ? 'ocre' : 'gris'}">${fmtHoras(c.trabajadas || null)}</span></div>
     <div class="c-comp"><span class="lbl-movil">Computadas</span><span class="num">${c.computadas ? fmtHoras(c.computadas) : '<span class="gris">0 h</span>'}</span></div>
-    <div class="c-banco"><span class="lbl-movil">Banco</span>${celdaBanco(c)}</div>
+    <div class="c-banco"><span class="lbl-movil">Saldo</span>${celdaBanco(c)}</div>
     <div class="c-estado">${c.estado ? `<span class="estado ${c.tono}">${esc(c.estado)}</span>` : ''}</div>${listo}
   </div>`;
 }
 
 function diaCompleto(r, c) { return !!(c.justificado || (r && r.entrada && r.salida)); }
 
-const cabeceraDias = () => `<div class="dias-cab"><span>Día</span><span>Entrada</span><span>Salida</span><span>Novedad</span><span>Nota</span><span>Trabajadas</span><span>Computadas</span><span>Banco</span><span>Estado</span></div>`;
+const cabeceraDias = () => `<div class="dias-cab"><span>Día</span><span>Entrada</span><span>Salida</span><span>Novedad</span><span>Nota</span><span>Trabajadas</span><span>Computadas</span><span>Saldo</span><span>Estado</span></div>`;
 
 function leerFila(fila) {
   const o = {};
@@ -116,14 +119,16 @@ function vistaSemana() {
 
   const enTope = banco.saldo >= CFG.topeBancoMin;
   const pctBanco = Math.min(100, banco.saldo / CFG.topeBancoMin * 100);
-  const pctSemana = s.meta ? Math.min(100, s.computadas / s.meta * 100) : 100;
 
   const avisos = [];
   let metaBanner;
   {
     const sinCargar = s.dias.filter(d => d.calc.vacio).map(d => `${nombreDia(d.fecha).toLowerCase()} ${dd_mm(d.fecha)}`);
-    if (s.falta > 0) metaBanner = ['malo', `Faltan ${fmtHoras(s.falta)} para la meta de ${fmtHoras(s.meta)}.${sinCargar.length ? ` Sin cargar: ${sinCargar.join(', ')}.` : ''}`];
-    else metaBanner = ['ok', `Meta semanal cumplida: ${fmtHoras(s.computadas)} de ${fmtHoras(s.meta)}.`];
+    // Control formal: 28 h con novedades a 7 h, 4 días con al menos 4 h reales.
+    const control = `${fmtHoras(s.computadas)} de ${fmtHoras(s.meta)} · ${s.cumplidos} de ${s.diasMeta} días`;
+    if (s.falta > 0 || s.faltanDias > 0) {
+      metaBanner = ['malo', `Meta incumplida: ${control}.${s.falta > 0 ? ` Faltan ${fmtHoras(s.falta)}.` : ""}${sinCargar.length ? ` Sin cargar: ${sinCargar.join(', ')}.` : ''}`];
+    } else metaBanner = ['ok', `Meta cumplida: ${control}.`];
   }
   for (const d of s.dias) {
     if (d.calc.estado === 'Revisar') avisos.push(['malo', `${nombreDia(d.fecha)} ${dd_mm(d.fecha)}: menos de ${fmtHoras(CFG.minimoMin)} trabajadas. No se considera jornada cumplida.`]);
@@ -151,10 +156,9 @@ function vistaSemana() {
       ${enTope ? '<p class="alerta-tope">Banco en el tope: las horas nuevas que sumes se pierden.</p>' : ''}
     </div>
     <div class="tarjeta">
-      <p class="rotulo">Esta semana</p>
-      <p class="cifra">${fmtHoras(s.computadas)} <small>/ ${fmtHoras(s.meta)}</small></p>
-      <div class="barra clara"><i style="width:${pctSemana}%"></i></div>
-      <p class="nota">${s.falta > 0 ? `Faltan ${fmtHoras(s.falta)}` : 'Meta cumplida'}${s.descuento ? ` · Descuento banco ${fmtHoras(s.descuento)}` : ''}${s.credito ? ` · Excedente ${fmtHoras(s.credito)} al banco` : ''}</p>
+      <p class="rotulo">${s.saldo < 0 ? 'Te falta' : s.saldo > 0 ? 'Acumulás' : 'Esta semana'}</p>
+      <p class="cifra saldo ${s.saldo < 0 ? 'neg' : s.saldo > 0 ? 'pos' : ''}">${s.saldo === 0 ? '0 h' : fmtHoras(Math.abs(s.saldo))}</p>
+      <p class="nota">Trabajadas reales ${fmtHoras(s.trabajadas)}${s.descuento ? ` · Descuento banco ${fmtHoras(s.descuento)}` : ''}</p>
     </div>
     <div class="tarjeta">
       <p class="rotulo">Días cumplidos</p>
@@ -183,9 +187,9 @@ function vistaSemana() {
     })()}</div>
     <div class="resumen">
       <div class="avisos" style="flex:1;min-width:240px">${avisos.map(([t, m]) => `<div class="av ${t}">${esc(m)}</div>`).join('')}</div>
-      <div class="nota" style="text-align:right">Computadas <b>${fmtHoras(s.computadas)}</b> de ${fmtHoras(s.meta)}<br>Trabajadas reales ${fmtHoras(s.trabajadas)}</div>
+      <div class="nota" style="text-align:right">Trabajadas reales <b>${fmtHoras(s.trabajadas)}</b><br>Saldo de la semana ${s.saldo === 0 ? '0 h' : fmtHoras(s.saldo, { signo: true })}</div>
     </div>
-    <p class="pie-tarjeta">Los cambios se guardan solos. Meta: 28 h en 4 días. Mínimo real de 4 h por día.${CFG.excedenteSemanal ? ' Lo que pase de 28 h en la semana va al banco.' : ''} Vacaciones, franco, feriado y capacitación cuentan como 7 h; home office solo registra el día.</p>
+    <p class="pie-tarjeta">Los cambios se guardan solos. Meta: 4 días de 7 h. Cada día trabajado suma o resta contra 7 h (mínimo real 4 h). Si la semana queda a favor, va al banco. Vacaciones, franco, feriado y capacitación cuentan como 7 h; home office solo registra el día.</p>
   </section>
   <div class="espacio"></div>
   <section class="grilla-2">
@@ -213,7 +217,7 @@ function vistaSemana() {
 function ayuda() {
   return `<details class="ayuda"><summary>Cómo se calculan mis horas</summary><ul>
     <li><b>Horas trabajadas</b> = salida − entrada.</li>
-    <li>${CFG.excedenteSemanal ? 'Día normal: suma sus horas reales a la semana. Lo que pase de 28 h en la semana se suma al banco (por ejemplo, un quinto día trabajado).' : 'Día normal: computa hasta 7 h para la semana. Lo que pase de 7 h se suma al banco.'}</li>
+    <li>Día normal: horas reales − 7 h. Ejemplo: 9:00 a 15:00 te falta 1 h; 9:00 a 19:00 acumulás 3 h. El saldo de la semana se va sumando día a día; si al final queda a favor, va al banco.</li>
     <li><b>Entrada demorada</b> o <b>salida anticipada</b> (con al menos 4 h): figura Presente, computa 7 h y descuenta del banco lo que falta para 7 h.</li>
     <li>Menos de 4 h trabajadas: <b>Revisar</b>, no computa ni descuenta.</li>
     <li><b>Home office</b>: registra el día, no suma horas ni mueve el banco.</li>

@@ -12,9 +12,9 @@ export const CONFIG_DEFAULT = {
   topeBancoMin: 70 * 60,   // tope del banco de horas
   capacitacionesAnio: 4,
   francosAnio: 15,
-  // true: cada día suma sus horas reales y al banco va lo que pase de la meta semanal.
+  // true: cada día trabajado suma sus horas reales − 7 h al saldo de la semana; si queda positivo va al banco.
   // false: cada día computa hasta 7 h y al banco va lo que pase de 7 h en el día.
-  excedenteSemanal: false,
+  excedenteSemanal: true,
   horarioHabitual: '10:00–17:00',
   salidaMaxMin: 19 * 60, // la salida cuenta como máximo hasta las 19:00
 };
@@ -94,10 +94,12 @@ export function calcularDia(rec, cfg = CONFIG_DEFAULT) {
   if (JUSTIFICA_FALTANTE.includes(novedad)) {
     res.computadas = semanal ? Math.max(H, J) : J;
     res.descuento = Math.max(0, J - H);
+    res.diferencia = Math.max(0, H - J); // lo que falta lo cubre el banco
     res.estado = novedad === 'Entrada Demorada' ? 'Presente (demora)' : 'Presente (salida anticipada)';
     res.tono = 'ok';
   } else {
     res.computadas = semanal ? H : Math.min(H, J);
+    res.diferencia = H - J;
     res.estado = 'Presente';
     res.tono = 'ok';
     if (H < J && !semanal) res.avisos.push(`Faltan ${fmtHoras(J - H)} para la jornada`);
@@ -132,10 +134,14 @@ export function calcularSemana(lunesIso, registros, cfg = CONFIG_DEFAULT) {
   const computadas = dias.reduce((a, d) => a + d.calc.computadas, 0);
   const trabajadas = dias.reduce((a, d) => a + (d.calc.trabajadas || 0), 0);
   const descuento = dias.reduce((a, d) => a + d.calc.descuento, 0);
-  const credito = cfg.excedenteSemanal ? Math.max(0, computadas - meta) : dias.reduce((a, d) => a + d.calc.credito, 0);
+  // Saldo de la semana: por cada día trabajado, horas reales − 7 h (vacaciones, feriados, etc. no cuentan).
+  const saldo = dias.reduce((a, d) => a + (d.calc.diferencia || 0), 0);
+  const credito = cfg.excedenteSemanal ? Math.max(0, saldo) : dias.reduce((a, d) => a + d.calc.credito, 0);
   const revisar = dias.filter(d => ['Revisar', 'No Entrada', 'No Salida', 'Revisar horario'].includes(d.calc.estado));
   const cumplidos = dias.filter(d => d.calc.computadas > 0).length;
-  return { dias, meta, computadas, trabajadas, descuento, credito, revisar, cumplidos, justificados, falta: Math.max(0, meta - computadas) };
+  const diasMeta = Math.round(meta / cfg.jornadaMin);
+  return { dias, meta, computadas, trabajadas, descuento, credito, saldo, revisar, cumplidos, justificados, diasMeta,
+    faltanDias: Math.max(0, diasMeta - cumplidos), falta: Math.max(0, meta - computadas) };
 }
 
 // Libro del banco de horas. movimientos manuales: {id, fecha, banco:'horas', minutos, concepto}
