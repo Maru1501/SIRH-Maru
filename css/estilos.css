@@ -117,7 +117,7 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -.02em; margin: 8px 0 6p
 }
 .campo:focus { outline: 2px solid #b9d0ae; outline-offset: 0; background: #fff; }
 input.campo[type=time] { min-width: 0; }
-input.campo[type=date] { width: auto; }
+input.campo.fecha { width: 8.5em; font-variant-numeric: tabular-nums; }
 select.campo { padding-right: 6px; }
 
 /* Filas de días (semana y anual) */

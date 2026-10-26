@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610261626';
-import { almacen, registroVacio } from './db.js?v=202610261626';
+} from './calc.js?v=202610261642';
+import { almacen, registroVacio } from './db.js?v=202610261642';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -39,7 +39,8 @@ function toast(msg, error = false) {
 
 function render() {
   const foco = document.activeElement;
-  const clave = foco && foco.dataset && foco.dataset.campo ? `[data-fecha="${foco.closest('[data-fecha]')?.dataset.fecha}"] [data-campo="${foco.dataset.campo}"]` : foco?.id ? `#${foco.id}` : null;
+  const sig = ui.focoSig; ui.focoSig = null;
+  const clave = sig ? `#${sig}` : foco && foco.dataset && foco.dataset.campo ? `[data-fecha="${foco.closest('[data-fecha]')?.dataset.fecha}"] [data-campo="${foco.dataset.campo}"]` : foco?.id ? `#${foco.id}` : null;
   $$('.menu-lateral button[data-vista]').forEach(b => b.classList.toggle('activa', b.dataset.vista === ui.vista));
   $('#vista-actual').textContent = { semana: 'Semana', anual: 'Carga anual', banco: 'Banco de horas', vacaciones: 'Novedades', config: 'Configuración' }[ui.vista];
   const v = $('#vista');
@@ -179,7 +180,7 @@ function vistaSemana() {
         <button class="boton icono" data-accion="sem-ant" aria-label="Semana anterior">←</button>
         <button class="boton" data-accion="sem-hoy">Hoy</button>
         <button class="boton icono" data-accion="sem-sig" aria-label="Semana siguiente">→</button>
-        <input class="campo" type="date" id="ir-fecha" value="${ui.lunes}" aria-label="Ir a la semana de">
+        <input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="ir-fecha" value="${fechaTxt(ui.lunes)}" aria-label="Ir a la semana de">
       </div>
     </div>
     <div class="av meta-banner ${metaBanner[0]}">${esc(metaBanner[1])}</div>
@@ -256,8 +257,8 @@ function vistaAnual() {
     </div>
     <details class="ayuda" style="margin:0 0 14px"><summary>Completar varios días de una vez</summary>
       <div class="form-fila" style="margin-top:12px">
-        <label>Desde<input class="campo" type="date" id="r-desde" value="${R.desde}"></label>
-        <label>Hasta<input class="campo" type="date" id="r-hasta" value="${R.hasta}"></label>
+        <label>Desde<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="r-desde" value="${fechaTxt(R.desde)}"></label>
+        <label>Hasta<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="r-hasta" value="${fechaTxt(R.hasta)}"></label>
         <label>Entrada<input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" id="r-entrada" value="${R.entrada}"></label>
         <label>Salida<input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" id="r-salida" value="${R.salida}"></label>
         <label>Novedad<select class="campo" id="r-novedad">${opcionesNovedad(R.novedad)}</select></label>
@@ -308,7 +309,7 @@ function vistaBanco() {
       <p class="rotulo">Agregar movimiento manual</p>
       <p class="nota" style="margin:6px 0 12px">Para cargar el saldo inicial o corregir algo. Usá horas como 5, 2,5 o 1:30. Para restar, poné un signo menos.</p>
       <div class="form-fila">
-        <label>Fecha<input class="campo" type="date" id="m-fecha" value="${hoyIso()}"></label>
+        <label>Fecha<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="m-fecha" value="${fechaTxt(hoyIso())}"></label>
         <label>Horas<input class="campo" type="text" id="m-horas" placeholder="Ej: 12 o -1:30" inputmode="text"></label>
         <label style="grid-column:span 2">Concepto<input class="campo" type="text" id="m-concepto" placeholder="Saldo inicial" maxlength="120"></label>
         <button class="boton principal" data-accion="agregar-horas">Agregar</button>
@@ -426,8 +427,8 @@ function vistaVacaciones() {
       <select class="campo" id="n-anio" style="width:auto" aria-label="Año">${anios.map(a => `<option${a === N.anio ? ' selected' : ''}>${a}</option>`).join('')}</select></div>
     <div class="form-fila">
       <label>Novedad<select class="campo" id="n-tipo">${[...NOV_PERIODO, 'Quitar novedad'].map(t => `<option${t === N.tipo ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label>Desde<input class="campo" type="date" id="n-desde" value="${N.desde}"></label>
-      <label>Hasta<input class="campo" type="date" id="n-hasta" value="${N.hasta}"></label>
+      <label>Desde<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="n-desde" value="${fechaTxt(N.desde)}"></label>
+      <label>Hasta<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="n-hasta" value="${fechaTxt(N.hasta)}"></label>
       <button class="boton principal" data-accion="cargar-periodo"${n && !bloqueado ? '' : ' disabled'}>${N.tipo === 'Quitar novedad' ? 'Quitar' : 'Cargar'}</button>
     </div>
     <div style="margin-top:10px">${preview || '<p class="nota">Elegí la novedad y el rango. Se cargan solo los días hábiles (lunes a viernes) y cada día queda marcado en la semana.</p>'}</div>
@@ -637,7 +638,7 @@ document.addEventListener('click', async ev => {
     }
     case 'agregar-horas': {
       const min = parsearHoras($('#m-horas').value);
-      const fecha = $('#m-fecha').value;
+      const fecha = isoDe($('#m-fecha'));
       if (!fecha || min === null || min === 0) { toast('Indicá la fecha y las horas (ej: 12, 2,5 o -1:30)', true); break; }
       try { await almacen.agregarMovimiento({ fecha, banco: 'horas', cantidad: min, concepto: $('#m-concepto').value.trim() || (min > 0 ? 'Ajuste manual (suma)' : 'Ajuste manual (resta)') }); toast('Movimiento agregado'); }
       catch (e) { toast(e.message, true); }
@@ -699,19 +700,21 @@ document.addEventListener('click', async ev => {
 
 document.addEventListener('change', async ev => {
   const el = ev.target;
-  if (el.id === 'ir-fecha' && el.value) return irSemana(el.value);
+  if (el.id === 'ir-fecha' && isoDe(el)) return irSemana(isoDe(el));
   if (el.id === 'sel-anio') { ui.anio = +el.value; return render(); }
   if (el.id === 'sel-mes') { ui.mes = el.value === 'todos' ? 'todos' : +el.value; return render(); }
   if (el.id === 'sel-anio-banco') { ui.anioBanco = el.value; return render(); }
   if (el.id === 'n-anio') { ui.nov.anio = +el.value; return render(); }
   if (['n-tipo', 'n-desde', 'n-hasta'].includes(el.id)) {
-    ui.nov[el.id.slice(2)] = el.value;
-    if (el.id === 'n-desde' && el.value && (!ui.nov.hasta || ui.nov.hasta < el.value)) ui.nov.hasta = el.value;
+    const val = el.classList.contains('fecha') ? isoDe(el) : el.value;
+    ui.nov[el.id.slice(2)] = val;
+    if (el.id === 'n-desde' && val && (!ui.nov.hasta || ui.nov.hasta < val)) ui.nov.hasta = val;
     return render();
   }
   if (el.id && el.id.startsWith('r-')) {
     const k = { 'r-desde': 'desde', 'r-hasta': 'hasta', 'r-entrada': 'entrada', 'r-salida': 'salida', 'r-novedad': 'novedad', 'r-vacios': 'soloVacios' }[el.id];
-    if (k) ui.rango[k] = el.type === 'checkbox' ? el.checked : el.value;
+    if (k) ui.rango[k] = el.type === 'checkbox' ? el.checked : el.classList.contains('fecha') ? isoDe(el) : el.value;
+    if (el.id === 'r-desde' && ui.rango.desde && (!ui.rango.hasta || ui.rango.hasta < ui.rango.desde)) { ui.rango.hasta = ui.rango.desde; $('#r-hasta').value = fechaTxt(ui.rango.desde); }
     return;
   }
   if (!el.dataset.campo) return;
@@ -785,11 +788,62 @@ document.addEventListener('change', ev => {
 }, true);
 document.addEventListener('focusin', ev => { if (ev.target.classList?.contains('hora')) ev.target.select(); });
 
+// ---------- fechas con teclado ----------
+// Se escriben de corrido y las barras se ponen solas (26102026 → 26/10/2026). Se guardan como AAAA-MM-DD.
+function fechaTxt(f) { return f && /^\d{4}-\d{2}-\d{2}$/.test(f) ? `${f.slice(8)}/${f.slice(5, 7)}/${f.slice(0, 4)}` : ''; }
+function isoDe(el) { return el ? normalizarFecha(el.value)?.iso || '' : ''; }
+function formatearFecha(txt) {
+  const d = txt.replace(/\D/g, '').slice(0, 8);
+  return d.length > 4 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+}
+// Acepta 26/10/2026, 26102026, 26/10/26, 26/10 o 2610 (año actual), 5/12 (con barra, un dígito).
+export function normalizarFecha(txt) {
+  const t = String(txt || '').trim();
+  if (!t) return { iso: '', txt: '' };
+  let d, m, a;
+  const partes = t.split(/[\/\-. ]+/).filter(Boolean);
+  if (partes.length >= 2 && partes.length <= 3) [d, m, a] = partes;
+  else {
+    const n = t.replace(/\D/g, '');
+    if (n.length !== 4 && n.length !== 6 && n.length !== 8) return null;
+    d = n.slice(0, 2); m = n.slice(2, 4); a = n.slice(4);
+  }
+  d = +d; m = +m;
+  a = !a ? new Date().getFullYear() : a.length <= 2 ? 2000 + +a : +a;
+  const f = new Date(a, m - 1, d);
+  if (!d || !m || a < 2000 || a > 2100 || f.getMonth() !== m - 1 || f.getDate() !== d) return null;
+  const i = iso(f);
+  return { iso: i, txt: fechaTxt(i) };
+}
+const SIG_FECHA = { 'n-desde': 'n-hasta', 'r-desde': 'r-hasta' };
+document.addEventListener('input', ev => {
+  const el = ev.target;
+  if (!el.classList || !el.classList.contains('fecha')) return;
+  const borrando = ev.inputType && ev.inputType.startsWith('delete');
+  if (borrando) return;
+  // si la persona escribe sus propias barras en otro lugar (5/12), se respeta y se ordena al salir
+  const barras = [...el.value].map((c, i) => c === '/' ? i : -1).filter(i => i >= 0);
+  if (barras.every(i => i === 2 || i === 5)) el.value = formatearFecha(el.value);
+  if (el.value.length === 10) {
+    // fecha completa: pasar al campo siguiente
+    if (SIG_FECHA[el.id]) { ui.focoSig = SIG_FECHA[el.id]; $('#' + SIG_FECHA[el.id])?.focus(); setTimeout(() => { ui.focoSig = null; }); }
+    else el.blur();
+  }
+});
+document.addEventListener('change', ev => {
+  const el = ev.target;
+  if (!el.classList || !el.classList.contains('fecha')) return;
+  const n = normalizarFecha(el.value);
+  if (n === null) { toast('Fecha inválida. Escribila como 26102026 o 26/10/2026', true); el.value = ''; }
+  else el.value = n.txt;
+}, true);
+document.addEventListener('focusin', ev => { if (ev.target.classList?.contains('fecha')) ev.target.select(); });
+
 window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).length) { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610261626';
+const VERSION = '202610261642';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
