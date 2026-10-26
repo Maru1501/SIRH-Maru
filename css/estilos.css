@@ -87,7 +87,7 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -.02em; margin: 8px 0 6p
 .barra > i { display: block; height: 100%; background: #d9e8a8; border-radius: 4px; }
 .barra.clara { background: #ecebe4; }
 .barra.clara > i { background: var(--verde-2); }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 0; }
 .chip { font-size: 11.5px; padding: 3px 9px; border-radius: 6px; background: #efeee8; color: var(--texto-3); }
 .chip.si { background: var(--verde-claro); color: var(--verde); }
 .chip.no { background: var(--rojo-claro); color: var(--rojo); }
@@ -295,7 +295,7 @@ ol.pasos { padding-left: 20px; margin: 4px 0; display: grid; gap: 4px; }
 .combo-desc { display: flex; gap: 6px; }
 .combo-desc select { flex: 1; min-width: 0; }
 .boton.chico { padding: 0 10px; min-width: 0; }
-.banco-inicial { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--borde); margin-top: 10px; }
+.banco-inicial { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--borde); margin-top: 0; }
 details.mes-banco { border-bottom: 1px solid var(--borde); }
 details.mes-banco summary { cursor: pointer; list-style: none; display: grid; grid-template-columns: 1.3fr repeat(3, 1fr); gap: 8px; align-items: baseline; padding: 12px 4px; }
 details.mes-banco summary::-webkit-details-marker { display: none; }
@@ -308,3 +308,4 @@ details.mes-banco summary .sub { grid-column: 1 / -1; font-size: 11.5px; color: 
 details.mes-banco .tabla-scroll { padding-bottom: 10px; }
 tr.sem-fila td { background: var(--fondo-2, rgba(0,0,0,.035)); font-weight: 600; font-size: 12.5px; }
 @media (max-width: 560px) { details.mes-banco summary { grid-template-columns: 1fr 1fr 1fr; } details.mes-banco summary .mb-mes { grid-column: 1 / -1; } }
+.meses-banco { margin-top: 10px; }

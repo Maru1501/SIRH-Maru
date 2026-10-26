@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO, saldoInicialNecesario,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610262108';
-import { almacen, registroVacio } from './db.js?v=202610262108';
+} from './calc.js?v=202610262117';
+import { almacen, registroVacio } from './db.js?v=202610262117';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -349,7 +349,7 @@ function vistaBanco() {
   </section>`;
 }
 
-// Historial: carga inicial arriba, un renglón por mes (se abre) y adentro el detalle por semana.
+// Historial: de lo más nuevo a lo más viejo; un renglón por mes (se abre) con el detalle por semana y la carga inicial al final.
 const esInicial = e => e.manual && /^saldo inicial/i.test(e.concepto || '');
 function filaMov(e) {
   return `<tr>
@@ -372,11 +372,11 @@ function historialBanco(eventos) {
   const sum = (l, f) => l.reduce((a, e) => a + f(e), 0);
   const inicial = `<div class="banco-inicial"><span><b>Carga inicial</b>${iniciales.length ? ` · ${fechaCorta(iniciales[0].fecha)}` : ''}</span>
     <span class="num">${fmtHoras(sum(iniciales, e => e.aplicado), { vacio: '0 h' }) || '0 h'}${iniciales.map(e => ` <button class="enlace" data-borrar-mov="${e.id}" title="Borrar carga inicial">✕</button>`).join('')}</span></div>`;
-  const filas = [...meses].map(([k, l]) => {
+  const filas = [...meses].reverse().map(([k, l]) => {
     const gan = sum(l, e => Math.max(0, e.aplicado)), usa = sum(l, e => Math.max(0, -e.aplicado)), perd = sum(l, e => e.perdido || 0);
     const semanas = new Map();
     for (const e of l) { const w = iso(lunesDe(desdeIso(e.dia || e.fecha))); if (!semanas.has(w)) semanas.set(w, []); semanas.get(w).push(e); }
-    const detalle = [...semanas].map(([w, le]) => `<tr class="sem-fila"><td colspan="2">Semana del ${fechaCorta(w)}</td><td class="der">${fmtHoras(sum(le, e => e.aplicado), { signo: true, vacio: '0 h' }) || '0 h'}</td><td class="der">${fmtHoras(le.at(-1).saldo)}</td><td></td></tr>${le.map(filaMov).join('')}`).join('');
+    const detalle = [...semanas].reverse().map(([w, le]) => `<tr class="sem-fila"><td colspan="2">Semana del ${fechaCorta(w)}</td><td class="der">${fmtHoras(sum(le, e => e.aplicado), { signo: true, vacio: '0 h' }) || '0 h'}</td><td class="der">${fmtHoras(le.at(-1).saldo)}</td><td></td></tr>${le.slice().reverse().map(filaMov).join('')}`).join('');
     const [a, m] = k.split('-');
     return `<details class="mes-banco" data-mes="${k}"${ui.mesesBanco.has(k) ? ' open' : ''}>
       <summary><span class="mb-mes">${MESES[+m - 1][0].toUpperCase() + MESES[+m - 1].slice(1)} ${a}</span>
@@ -387,7 +387,7 @@ function historialBanco(eventos) {
       <div class="tabla-scroll"><table class="historial"><thead><tr><th>Fecha</th><th>Concepto</th><th class="der">Horas</th><th class="der">Saldo</th><th></th></tr></thead><tbody>${detalle}</tbody></table></div>
     </details>`;
   }).join('');
-  return `${inicial}<div class="meses-banco">${filas}</div>`;
+  return `<div class="meses-banco">${filas}</div>${inicial}`;
 }
 document.addEventListener('toggle', ev => {
   const d = ev.target;
@@ -945,7 +945,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610262108';
+const VERSION = '202610262117';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
