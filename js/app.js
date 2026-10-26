@@ -1,8 +1,8 @@
 import {
-  NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO,
+  NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO, saldoInicialNecesario,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610262051';
-import { almacen, registroVacio } from './db.js?v=202610262051';
+} from './calc.js?v=202610262054';
+import { almacen, registroVacio } from './db.js?v=202610262054';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -305,7 +305,12 @@ function vistaBanco() {
       <p class="nota">${enTope ? 'Estás en el tope.' : `Podés sumar ${fmtHoras(CFG.topeBancoMin - b.saldo)} más antes del tope.`}</p>
       ${enTope ? '<p class="alerta-tope">El banco está en 70 h: las horas nuevas que se sumen se pierden.</p>' : ''}
       ${b.reinicio ? `<p class="nota">Calculado desde el ${fechaTxt(b.reinicio)}.</p>` : ''}
-      ${b.sinDescontar ? `<p class="alerta-tope">Hay ${fmtHoras(b.sinDescontar)} de francos o demoras que no se pudieron descontar porque el banco estaba en 0. Si arrancaste el año con horas guardadas, cargalas como saldo inicial al 01/01 en "Agregar movimiento manual".</p>` : ''}
+      ${b.sinDescontar ? (() => {
+        const desde = b.reinicio || `${b.eventos[0]?.fecha.slice(0, 4) || new Date().getFullYear()}-01-01`;
+        const necesario = saldoInicialNecesario(registros, movimientos, CFG, desde);
+        return `<p class="alerta-tope">Hay ${fmtHoras(b.sinDescontar)} de francos o demoras que se tomaron con el banco en 0. Eso quiere decir que ya traías horas guardadas. Para que todo cierre, al ${fechaTxt(desde)} tenías que tener al menos <b>${fmtHoras(necesario)}</b>.</p>
+        <button class="boton" style="margin-top:8px" data-accion="saldo-inicial" data-fecha="${desde}" data-min="${necesario}">Cargar ${fmtHoras(necesario)} como saldo inicial</button>`;
+      })() : ''}
     </div>
     <div class="tarjeta">
       <p class="rotulo">Agregar movimiento manual</p>
@@ -691,6 +696,12 @@ document.addEventListener('click', async ev => {
       } catch (e) { toast(e.message, true); }
       render(); break;
     }
+    case 'saldo-inicial': {
+      const min = +t.dataset.min, fecha = t.dataset.fecha;
+      try { await almacen.agregarMovimiento({ fecha, banco: 'horas', cantidad: min, concepto: 'Saldo inicial (traído del año anterior)' }); toast(`Saldo inicial de ${fmtHoras(min)} cargado al ${fechaTxt(fecha)}`); }
+      catch (e) { toast(e.message, true); }
+      render(); break;
+    }
     case 'reiniciar-banco': {
       const fecha = isoDe($('#b-reinicio'));
       if (!fecha) { toast('Indicá desde qué fecha recalcular', true); break; }
@@ -896,7 +907,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610262051';
+const VERSION = '202610262054';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {

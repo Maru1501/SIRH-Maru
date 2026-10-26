@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { CONFIG_DEFAULT as BASE, calcularDia as cd, calcularSemana as cs, libroBancoHoras as lbh, libroBancoVacaciones } from '../js/calc.js';
+import { CONFIG_DEFAULT as BASE, calcularDia as cd, calcularSemana as cs, libroBancoHoras as lbh, libroBancoVacaciones, saldoInicialNecesario } from '../js/calc.js';
 const CONFIG_DEFAULT = { ...BASE, excedenteSemanal: true };
 const calcularDia = (r, c = CONFIG_DEFAULT) => cd(r, c), calcularSemana = (l, r, c = CONFIG_DEFAULT) => cs(l, r, c), libroBancoHoras = (r, m, c = CONFIG_DEFAULT) => lbh(r, m, c);
 const h = n => n * 60;
@@ -128,10 +128,11 @@ caso('Reinicio del banco: arranca en 0 y solo cuenta desde esa fecha', () => {
   const b = libroBancoHoras(regs, movs);
   assert.equal(b.saldo, h(3)); assert.equal(b.reinicio, '2026-02-01');
 });
-caso('Franco el lunes se cubre con lo ganado esa misma semana', () => {
+caso('Franco sin horas previas no se cubre con lo de la misma semana; saldo inicial necesario', () => {
   const regs = { '2026-03-02': { novedad: 'Franco' } };
   for (const d of ['03', '04', '05', '06']) regs[`2026-03-${d}`] = { entrada: '08:00', salida: '17:00' }; // +2 h x 4 = 8 h
   const b = libroBancoHoras(regs, []);
-  assert.equal(b.sinDescontar, 0); assert.equal(b.saldo, h(1));
+  assert.equal(b.sinDescontar, h(7)); assert.equal(b.saldo, h(8));
+  assert.equal(saldoInicialNecesario(regs, [], undefined, '2026-01-01'), h(7));
 });
 console.log(`\n${ok} casos OK`);

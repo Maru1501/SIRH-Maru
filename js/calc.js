@@ -159,9 +159,8 @@ export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
     const c = calcularDia(rec, cfg);
     semanas.add(iso(lunesDe(desdeIso(fecha))));
     if (c.credito > 0) eventos.push({ fecha, orden: 1, concepto: 'Excedente del día', pedido: c.credito });
-    // Con saldo semanal, lo que se descuenta en la semana se aplica después de sumar lo ganado esa misma semana.
-    const fin = cfg.excedenteSemanal ? iso(sumarDias(lunesDe(desdeIso(fecha)), 4)) : fecha;
-    if (c.descuento > 0) eventos.push({ fecha: fin, dia: fecha, orden: 4, concepto: `Descuento · ${c.novedad}`, pedido: -c.descuento });
+    // Se descuenta el mismo día: solo se pueden usar horas que ya estaban en el banco.
+    if (c.descuento > 0) eventos.push({ fecha, orden: 2, concepto: `Descuento · ${c.novedad}`, pedido: -c.descuento });
   }
   if (cfg.excedenteSemanal) {
     for (const lunes of semanas) {
@@ -169,7 +168,7 @@ export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
       if (sem.credito > 0) eventos.push({ fecha: iso(sumarDias(desdeIso(lunes), 4)), orden: 3, concepto: 'Excedente semanal', pedido: sem.credito });
     }
   }
-  eventos.sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.orden - b.orden || ((a.dia || '') < (b.dia || '') ? -1 : 1));
+  eventos.sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.orden - b.orden);
   // "Reinicio del banco": el banco arranca en 0 en esa fecha y solo cuenta lo que pasa desde ahí.
   const reinicio = (movimientos || []).filter(m => m.banco === 'horas' && m.concepto === REINICIO).map(m => m.fecha).sort().pop();
   if (reinicio) eventos.splice(0, eventos.length, ...eventos.filter(e => e.fecha >= reinicio && e.concepto !== REINICIO));
@@ -189,6 +188,18 @@ export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
     ev.saldo = saldo;
   }
   return { eventos, saldo, perdidas, sinDescontar, sumadas, usadas, reinicio };
+}
+
+// Saldo inicial mínimo para que todos los descuentos hayan tenido horas en el banco.
+export function saldoInicialNecesario(registros, movimientos, cfg = CONFIG_DEFAULT, fecha) {
+  let extra = 0;
+  for (let i = 0; i < 20; i++) {
+    const movs = extra ? [...(movimientos || []), { banco: 'horas', fecha, cantidad: extra, concepto: 'Saldo inicial' }] : movimientos;
+    const falta = libroBancoHoras(registros, movs, cfg).sinDescontar;
+    if (!falta || extra >= cfg.topeBancoMin) break;
+    extra = Math.min(cfg.topeBancoMin, extra + falta);
+  }
+  return extra;
 }
 
 // Libro del banco de vacaciones (en días)
