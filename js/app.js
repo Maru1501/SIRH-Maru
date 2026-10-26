@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=20261026a';
-import { almacen, registroVacio } from './db.js?v=20261026a';
+} from './calc.js?v=202610261530';
+import { almacen, registroVacio } from './db.js?v=202610261530';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -766,6 +766,25 @@ document.addEventListener('change', ev => {
 document.addEventListener('focusin', ev => { if (ev.target.classList?.contains('hora')) ev.target.select(); });
 
 window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).length) { e.preventDefault(); e.returnValue = ''; } });
+
+// ---------- versión ----------
+// Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
+const VERSION = '202610261530';
+async function verificarVersion() {
+  if (Object.keys(ui.borrador).length) return;
+  try {
+    const r = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const { v } = await r.json();
+    if (!v || v === VERSION) return;
+    const clave = 'sirh-maru:recargado';
+    if (sessionStorage.getItem(clave) === v) return; // evita recargar en bucle
+    sessionStorage.setItem(clave, v);
+    location.replace(`${location.pathname}?v=${v}`);
+  } catch {}
+}
+verificarVersion();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') verificarVersion(); });
 
 // ---------- inicio ----------
 {
