@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610261530';
-import { almacen, registroVacio } from './db.js?v=202610261530';
+} from './calc.js?v=202610261602';
+import { almacen, registroVacio } from './db.js?v=202610261602';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -44,6 +44,7 @@ function render() {
   $('#vista-actual').textContent = { semana: 'Semana', anual: 'Carga anual', banco: 'Banco de horas', vacaciones: 'Novedades', config: 'Configuración' }[ui.vista];
   const v = $('#vista');
   v.innerHTML = { semana: vistaSemana, anual: vistaAnual, banco: vistaBanco, vacaciones: vistaVacaciones, config: vistaConfig }[ui.vista]();
+  if (ui.enfocar) { ui.enfocar = false; if (enfocarPendiente()) return pintarEstado(); }
   if (clave) { const el = $(clave); if (el && el !== document.body) el.focus({ preventScroll: true }); }
   pintarEstado();
 }
@@ -191,6 +192,7 @@ function vistaSemana() {
       <summary>Detalles de la semana</summary>
       <p style="margin-top:8px">Trabajadas reales <b>${fmtHoras(s.trabajadas)}</b> · Saldo de la semana <b>${s.saldo === 0 ? '0 h' : fmtHoras(s.saldo, { signo: true })}</b></p>
       <p class="pie-tarjeta" style="margin-top:6px">Los cambios se guardan solos. Meta: 4 días de 7 h. Cada día trabajado suma o resta contra 7 h (mínimo real 4 h). Si la semana queda a favor, va al banco. Vacaciones, franco, feriado y capacitación cuentan como 7 h; home office solo registra el día.</p>
+      <p class="pie-tarjeta">Con teclado: escribí la hora de corrido (1030), pasa sola a la salida y después al próximo día vacío. <b>Re Pág / Av Pág</b> cambian de semana.</p>
     </details>
   </section>
   <div class="espacio"></div>
@@ -550,7 +552,24 @@ function menu(abrir) {
 $('#velo').addEventListener('click', () => menu(false));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') menu(false); });
 
-function irSemana(f) { ui.lunes = iso(lunesDe(desdeIso(f))); render(); }
+// Pone el cursor en la entrada del primer día sin cargar (para cargar todo con el teclado).
+const DIA_COMPLETO_NOV = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office'];
+function enfocarPendiente() {
+  for (const fila of $$('#vista .fila[data-fecha]')) {
+    const ent = $('[data-campo=entrada]', fila), sal = $('[data-campo=salida]', fila), nov = $('[data-campo=novedad]', fila);
+    if (!ent || DIA_COMPLETO_NOV.includes(nov?.value)) continue;
+    const vacio = !ent.value ? ent : !sal.value ? sal : null;
+    if (!vacio) continue;
+    if (fila.classList.contains('plegada')) { ui.abiertos.add(fila.dataset.fecha); ui.enfocar = true; render(); return true; }
+    vacio.focus({ preventScroll: false });
+    fila.scrollIntoView({ block: 'nearest' });
+    return true;
+  }
+  return false;
+}
+const conMouse = matchMedia('(pointer: fine)').matches;
+
+function irSemana(f) { ui.lunes = iso(lunesDe(desdeIso(f))); ui.enfocar = conMouse; render(); }
 
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('button');
@@ -578,8 +597,8 @@ document.addEventListener('click', async ev => {
   const a = t.dataset.accion;
   if (!a) return;
   switch (a) {
-    case 'sem-ant': ui.lunes = iso(sumarDias(desdeIso(ui.lunes), -7)); render(); break;
-    case 'sem-sig': ui.lunes = iso(sumarDias(desdeIso(ui.lunes), 7)); render(); break;
+    case 'sem-ant': ui.lunes = iso(sumarDias(desdeIso(ui.lunes), -7)); ui.enfocar = conMouse; render(); break;
+    case 'sem-sig': ui.lunes = iso(sumarDias(desdeIso(ui.lunes), 7)); ui.enfocar = conMouse; render(); break;
     case 'sem-hoy': irSemana(hoyIso()); break;
     case 'exportar': exportar(); break;
     case 'importar': $('#archivo-importar').click(); break;
@@ -753,6 +772,7 @@ document.addEventListener('input', ev => {
     const fila = el.closest('[data-fecha]');
     if (fila && el.dataset.campo === 'entrada') $('[data-campo=salida]', fila)?.focus();
     else if (el.id === 'r-entrada') $('#r-salida')?.focus();
+    else if (fila) { ui.enfocar = true; el.blur(); } // salida completa: guardar y pasar al próximo día vacío
     else el.blur();
   }
 });
@@ -769,7 +789,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610261530';
+const VERSION = '202610261602';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
@@ -793,5 +813,17 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   $('#menu-hoy').textContent = $('#hoy-texto').textContent;
 }
 almacen.alCambiar = pintarEstado;
+ui.enfocar = conMouse;
 render();
-almacen.iniciar().then(render);
+ui.enfocar = conMouse;
+almacen.iniciar().then(() => { ui.enfocar = conMouse && !document.activeElement?.classList?.contains('campo'); render(); });
+
+// Atajos: Re Pág / Av Pág cambian de semana
+document.addEventListener('keydown', e => {
+  if (ui.vista !== 'semana' || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'PageUp' || e.key === 'PageDown') {
+    e.preventDefault();
+    ui.lunes = iso(sumarDias(desdeIso(ui.lunes), e.key === 'PageUp' ? -7 : 7));
+    ui.enfocar = true; render();
+  }
+});
