@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610261642';
-import { almacen, registroVacio } from './db.js?v=202610261642';
+} from './calc.js?v=202610261647';
+import { almacen, registroVacio } from './db.js?v=202610261647';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -262,7 +262,7 @@ function vistaAnual() {
         <label>Entrada<input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" id="r-entrada" value="${R.entrada}"></label>
         <label>Salida<input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" id="r-salida" value="${R.salida}"></label>
         <label>Novedad<select class="campo" id="r-novedad">${opcionesNovedad(R.novedad)}</select></label>
-        <label class="check"><input type="checkbox" id="r-vacios"${R.soloVacios ? ' checked' : ''}> Solo días vacíos</label>
+        <label class="check"><input type="checkbox" id="r-vacios"${R.soloVacios ? ' checked' : ''}> No pisar días con horario</label>
         <button class="boton" data-accion="aplicar-rango">Aplicar</button>
       </div>
       <p class="nota" style="margin-top:8px">Se aplica a los días laborables del rango. Queda marcado como cambio pendiente hasta que guardes.</p>
@@ -368,16 +368,26 @@ function planPeriodo() {
   const { registros } = almacen.datos;
   const N = ui.nov;
   const quitar = N.tipo === 'Quitar novedad';
-  const plan = { dias: [], reemplaza: 0, feriados: 0, sinCambio: 0 };
+  // Siempre vale la última novedad cargada: lo que había en esos días se reemplaza y se recalcula todo.
+  const plan = { dias: [], reemplaza: 0, antes: {}, sinCambio: 0 };
   for (const f of diasHabiles(N.desde, N.hasta)) {
     const r = registros[f];
     if (quitar) { if (r && NOV_PERIODO.includes(r.novedad)) plan.dias.push(f); else plan.sinCambio++; continue; }
     if (r && r.novedad === N.tipo) { plan.sinCambio++; continue; }
-    if (N.tipo === 'Vacaciones' && r && r.novedad === 'Feriado') { plan.feriados++; continue; }
-    if (!registroVacio(r)) plan.reemplaza++;
+    if (!registroVacio(r)) {
+      plan.reemplaza++;
+      const k = r.novedad && r.novedad !== 'Sin novedad' ? r.novedad : 'horario';
+      plan.antes[k] = (plan.antes[k] || 0) + 1;
+    }
     plan.dias.push(f);
   }
   return plan;
+}
+
+// "2 de vacaciones y 1 con horario"
+function textoReemplazo(antes) {
+  const partes = Object.entries(antes).map(([k, c]) => k === 'horario' ? `${c} con horario` : `${c} de ${k.toLowerCase()}`);
+  return partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes.at(-1) : partes[0] || '';
 }
 
 function vistaVacaciones() {
@@ -397,15 +407,16 @@ function vistaVacaciones() {
     if (N.hasta < N.desde) preview = '<p class="av malo">La fecha "hasta" tiene que ser igual o posterior a "desde".</p>';
     else {
       const extra = [];
-      if (plan.reemplaza) extra.push(`${plan.reemplaza} ya ${plan.reemplaza === 1 ? 'tenía' : 'tenían'} algo cargado y se reemplaza`);
-      if (plan.feriados) extra.push(`${plan.feriados} ${plan.feriados === 1 ? 'feriado queda' : 'feriados quedan'} como feriado`);
+      const A = plan.antes, suma = t => (N.tipo === t ? n : 0) - (A[t] || 0);
+      if (plan.reemplaza) extra.push(`reemplaza ${textoReemplazo(A)}`);
       if (plan.sinCambio) extra.push(`${plan.sinCambio} sin cambios`);
+      const vacDesp = v.saldo - suma('Vacaciones'), francosDesp = francos + suma('Franco'), capacDesp = capac + suma('Capacitación');
       let efecto = '';
-      if (N.tipo === 'Vacaciones') efecto = ` Te quedarían <b>${v.saldo - n}</b> días de vacaciones.`;
-      if (N.tipo === 'Franco') efecto = ` Francos en ${N.anio}: <b>${francos + n} de ${CFG.francosAnio}</b>. Descuenta ${fmtHoras(n * CFG.jornadaMin)} del banco.`;
-      if (N.tipo === 'Capacitación') efecto = ` Capacitaciones en ${N.anio}: <b>${capac + n} de ${CFG.capacitacionesAnio}</b>.`;
-      const malo = (N.tipo === 'Vacaciones' && v.saldo - n < 0) || (N.tipo === 'Capacitación' && capac + n > CFG.capacitacionesAnio) || (N.tipo === 'Franco' && francos + n > CFG.francosAnio);
-      bloqueado = (N.tipo === 'Capacitación' && capac + n > CFG.capacitacionesAnio) || (N.tipo === 'Franco' && francos + n > CFG.francosAnio);
+      if (N.tipo === 'Vacaciones' || A.Vacaciones) efecto += ` Te quedarían <b>${vacDesp}</b> días de vacaciones${A.Vacaciones && N.tipo !== 'Vacaciones' ? ` (${A.Vacaciones === 1 ? 'vuelve 1 día' : `vuelven ${A.Vacaciones} días`})` : ''}.`;
+      if (N.tipo === 'Franco' || A.Franco) efecto += ` Francos en ${N.anio}: <b>${francosDesp} de ${CFG.francosAnio}</b>.${N.tipo === 'Franco' ? ` Descuenta ${fmtHoras(n * CFG.jornadaMin)} del banco.` : ''}`;
+      if (N.tipo === 'Capacitación' || A['Capacitación']) efecto += ` Capacitaciones en ${N.anio}: <b>${capacDesp} de ${CFG.capacitacionesAnio}</b>.`;
+      bloqueado = (N.tipo === 'Capacitación' && capacDesp > CFG.capacitacionesAnio) || (N.tipo === 'Franco' && francosDesp > CFG.francosAnio);
+      const malo = bloqueado || vacDesp < 0;
       if (bloqueado) efecto += N.tipo === 'Franco' ? ' No se pueden cargar más de 15 por año.' : ' No se pueden cargar más de 4 por año.';
       preview = `<p class="av ${malo ? 'malo' : 'ok'}">${N.tipo === 'Quitar novedad' ? `Se quita la novedad de <b>${n}</b> ${n === 1 ? 'día' : 'días'}.` : `Se cargan <b>${n}</b> ${n === 1 ? 'día hábil' : 'días hábiles'} de ${N.tipo.toLowerCase()}.`}${efecto}${extra.length ? ` (${extra.join(', ')}.)` : ''}</p>`;
     }
@@ -627,7 +638,9 @@ document.addEventListener('click', async ev => {
         const w = d.getDay(); if (w === 0 || w === 6) continue;
         const f = iso(d);
         const actual = ui.borrador[f] || almacen.datos.registros[f];
-        if (R.soloVacios && !registroVacio(actual)) continue;
+        // una novedad nueva reemplaza a la anterior; lo que se protege son los días con horario cargado
+        const otraNovedad = actual && actual.novedad && actual.novedad !== 'Sin novedad' && !actual.entrada && !actual.salida && R.novedad !== 'Sin novedad';
+        if (R.soloVacios && !registroVacio(actual) && !otraNovedad) continue;
         ui.borrador[f] = { entrada: R.entrada, salida: R.salida, novedad: R.novedad, nota: (actual && actual.nota) || '' };
         n++;
       }
@@ -671,7 +684,6 @@ document.addEventListener('click', async ev => {
       const plan = planPeriodo();
       const tipo = ui.nov.tipo, quitar = tipo === 'Quitar novedad';
       if (!plan.dias.length) break;
-      if (plan.reemplaza && !confirm(`${plan.reemplaza} de esos días ya tienen horarios u otra novedad. ¿Los reemplazo por ${tipo.toLowerCase()}?`)) break;
       const cambios = {};
       for (const f of plan.dias) {
         const r = almacen.datos.registros[f] || {};
@@ -679,7 +691,7 @@ document.addEventListener('click', async ev => {
           : { entrada: '', salida: '', novedad: tipo, nota: r.nota || '' };
       }
       t.disabled = true;
-      if (await guardar(cambios, quitar ? `Novedad quitada de ${plan.dias.length} días` : `${plan.dias.length} días de ${tipo.toLowerCase()} cargados`)) { ui.nov.desde = ''; ui.nov.hasta = ''; }
+      if (await guardar(cambios, quitar ? `Novedad quitada de ${plan.dias.length} días` : `${plan.dias.length} días de ${tipo.toLowerCase()} cargados${plan.reemplaza ? ` (reemplazó ${textoReemplazo(plan.antes)})` : ''}`)) { ui.nov.desde = ''; ui.nov.hasta = ''; }
       render(); break;
     }
     case 'conectar': {
@@ -729,7 +741,8 @@ async function aplicarFila(fila) {
   if (norm(rec) === norm(original)) return render();
   if (rec.entrada && rec.salida && rec.salida <= rec.entrada) toast('La salida tiene que ser posterior a la entrada', true);
   if (ui.vista === 'semana') {
-    await guardar({ [fecha]: rec });
+    const antes = original?.novedad || 'Sin novedad', ahora = rec.novedad || 'Sin novedad';
+    await guardar({ [fecha]: rec }, antes !== 'Sin novedad' && ahora !== antes ? `${antes} reemplazado por ${ahora === 'Sin novedad' ? 'sin novedad' : ahora.toLowerCase()}` : undefined);
   } else if (ui.vista === 'anual') {
     if (norm(rec) === norm(almacen.datos.registros[fecha])) delete ui.borrador[fecha]; else ui.borrador[fecha] = rec;
   }
@@ -843,7 +856,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610261642';
+const VERSION = '202610261647';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
