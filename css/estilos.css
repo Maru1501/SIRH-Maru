@@ -292,3 +292,6 @@ ol.pasos { padding-left: 20px; margin: 4px 0; display: grid; gap: 4px; }
   .stats, .stats.tres { grid-template-columns: 1fr 1fr; }
 }
 
+.combo-desc { display: flex; gap: 6px; }
+.combo-desc select { flex: 1; min-width: 0; }
+.boton.chico { padding: 0 10px; min-width: 0; }

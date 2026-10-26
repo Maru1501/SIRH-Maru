@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610261647';
-import { almacen, registroVacio } from './db.js?v=202610261647';
+} from './calc.js?v=202610261654';
+import { almacen, registroVacio } from './db.js?v=202610261654';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -437,7 +437,7 @@ function vistaVacaciones() {
     <div class="bloque-cab"><div><p class="rotulo">Cargar un período</p><h2>Novedades por fecha</h2></div>
       <select class="campo" id="n-anio" style="width:auto" aria-label="Año">${anios.map(a => `<option${a === N.anio ? ' selected' : ''}>${a}</option>`).join('')}</select></div>
     <div class="form-fila">
-      <label>Novedad<select class="campo" id="n-tipo">${[...NOV_PERIODO, 'Quitar novedad'].map(t => `<option${t === N.tipo ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>Novedad<span class="combo-desc"><select class="campo" id="n-tipo">${[...NOV_PERIODO, 'Quitar novedad'].map(t => `<option${t === N.tipo ? ' selected' : ''}>${t}</option>`).join('')}</select><button class="boton chico" data-accion="descargar-nov" title="Descargar los días de ${N.tipo === 'Quitar novedad' ? 'todas las novedades' : N.tipo.toLowerCase()} de ${N.anio}" aria-label="Descargar">⬇</button></span></label>
       <label>Desde<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="n-desde" value="${fechaTxt(N.desde)}"></label>
       <label>Hasta<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="n-hasta" value="${fechaTxt(N.hasta)}"></label>
       <button class="boton principal" data-accion="cargar-periodo"${n && !bloqueado ? '' : ' disabled'}>${N.tipo === 'Quitar novedad' ? 'Quitar' : 'Cargar'}</button>
@@ -680,6 +680,21 @@ document.addEventListener('click', async ev => {
       } catch (e) { toast(e.message, true); }
       render(); break;
     }
+    case 'descargar-nov': {
+      // Planilla (se abre con Excel) con los días cargados de la novedad elegida en el año elegido.
+      const { tipo, anio } = ui.nov, todas = tipo === 'Quitar novedad';
+      const filas = Object.entries(almacen.datos.registros)
+        .filter(([f, r]) => f.startsWith(String(anio)) && (todas ? NOV_PERIODO.includes(r.novedad) : r.novedad === tipo))
+        .sort(([a], [b]) => a < b ? -1 : 1);
+      if (!filas.length) { toast(`No hay días de ${todas ? 'novedades' : tipo.toLowerCase()} cargados en ${anio}`, true); break; }
+      const q = x => `"${String(x || '').replace(/"/g, '""')}"`;
+      const csv = ['Fecha;Día;Novedad;Nota', ...filas.map(([f, r]) => [fechaTxt(f), DIAS[desdeIso(f).getDay()], r.novedad, q(r.nota)].join(';')), `Total;${filas.length} días;;`].join('\r\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = `${todas ? 'novedades' : tipo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '-')}-${anio}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast(`Descargados ${filas.length} días`); break;
+    }
     case 'cargar-periodo': {
       const plan = planPeriodo();
       const tipo = ui.nov.tipo, quitar = tipo === 'Quitar novedad';
@@ -856,7 +871,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610261647';
+const VERSION = '202610261654';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
