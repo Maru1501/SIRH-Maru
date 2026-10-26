@@ -7,7 +7,7 @@ export const NOVEDADES = [
 
 export const CONFIG_DEFAULT = {
   jornadaMin: 7 * 60,      // jornada estándar
-  minimoMin: 4 * 60,       // mínimo real trabajado
+  minimoMin: 3 * 60,       // mínimo real trabajado
   metaSemanalMin: 28 * 60, // meta semanal
   topeBancoMin: 70 * 60,   // tope del banco de horas
   capacitacionesAnio: 4,

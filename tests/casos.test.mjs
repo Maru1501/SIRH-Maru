@@ -18,9 +18,17 @@ caso('10 a 17 sin novedad', () => {
   const c = calcularDia({ entrada: '10:00', salida: '17:00', novedad: 'Sin novedad' });
   assert.equal(c.trabajadas, h(7)); assert.equal(c.computadas, h(7)); assert.equal(c.descuento, 0); assert.equal(c.estado, 'Presente');
 });
-caso('10 a 13 (3 h) → Revisar', () => {
+caso('10 a 12:30 (2 h 30) → Revisar', () => {
+  const c = calcularDia({ entrada: '10:00', salida: '12:30', novedad: 'Sin novedad' });
+  assert.equal(c.trabajadas, 150); assert.equal(c.computadas, 0); assert.equal(c.descuento, 0); assert.equal(c.estado, 'Revisar');
+});
+caso('10 a 13 (3 h, el mínimo) → Presente, falta 4 h', () => {
   const c = calcularDia({ entrada: '10:00', salida: '13:00', novedad: 'Sin novedad' });
-  assert.equal(c.trabajadas, h(3)); assert.equal(c.computadas, 0); assert.equal(c.descuento, 0); assert.equal(c.estado, 'Revisar');
+  assert.equal(c.trabajadas, h(3)); assert.equal(c.estado, 'Presente'); assert.equal(c.diferencia, -h(4));
+});
+caso('12 a 15 + Salida Anticipada (3 h) → 7 h, descuenta 4 h', () => {
+  const c = calcularDia({ entrada: '12:00', salida: '15:00', novedad: 'Salida Anticipada' });
+  assert.equal(c.computadas, h(7)); assert.equal(c.descuento, h(4)); assert.match(c.estado, /^Presente/);
 });
 caso('Vacaciones → −1 día', () => {
   const regs = { '2026-03-02': { novedad: 'Vacaciones' } };

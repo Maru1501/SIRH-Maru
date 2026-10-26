@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610261602';
-import { almacen, registroVacio } from './db.js?v=202610261602';
+} from './calc.js?v=202610261615';
+import { almacen, registroVacio } from './db.js?v=202610261615';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -126,7 +126,7 @@ function vistaSemana() {
   let metaBanner;
   {
     const sinCargar = s.dias.filter(d => d.calc.vacio).map(d => `${nombreDia(d.fecha).toLowerCase()} ${dd_mm(d.fecha)}`);
-    // Control formal: 28 h con novedades a 7 h, 4 días con al menos 4 h reales.
+    // Control formal: 28 h con novedades a 7 h, 4 días con al menos 3 h reales.
     const control = `${fmtHoras(s.computadas)} de ${fmtHoras(s.meta)} · ${s.cumplidos} de ${s.diasMeta} días`;
     if (s.falta > 0 || s.faltanDias > 0) {
       metaBanner = ['malo', `Meta incumplida: ${control}.${s.falta > 0 ? ` Faltan ${fmtHoras(s.falta)}.` : ""}${sinCargar.length ? ` Sin cargar: ${sinCargar.join(', ')}.` : ''}`];
@@ -191,7 +191,7 @@ function vistaSemana() {
     <details class="ayuda detalle-semana">
       <summary>Detalles de la semana</summary>
       <p style="margin-top:8px">Trabajadas reales <b>${fmtHoras(s.trabajadas)}</b> · Saldo de la semana <b>${s.saldo === 0 ? '0 h' : fmtHoras(s.saldo, { signo: true })}</b></p>
-      <p class="pie-tarjeta" style="margin-top:6px">Los cambios se guardan solos. Meta: 4 días de 7 h. Cada día trabajado suma o resta contra 7 h (mínimo real 4 h). Si la semana queda a favor, va al banco. Vacaciones, franco, feriado y capacitación cuentan como 7 h; home office solo registra el día.</p>
+      <p class="pie-tarjeta" style="margin-top:6px">Los cambios se guardan solos. Meta: 4 días de 7 h. Cada día trabajado suma o resta contra 7 h (mínimo real 3 h). Si la semana queda a favor, va al banco. Vacaciones, franco, feriado y capacitación cuentan como 7 h; home office solo registra el día.</p>
       <p class="pie-tarjeta">Con teclado: escribí la hora de corrido (1030), pasa sola a la salida y después al próximo día vacío. <b>Re Pág / Av Pág</b> cambian de semana.</p>
     </details>
   </section>
@@ -222,14 +222,14 @@ function ayuda() {
   return `<details class="ayuda"><summary>Cómo se calculan mis horas</summary><ul>
     <li><b>Horas trabajadas</b> = salida − entrada.</li>
     <li>Día normal: horas reales − 7 h. Ejemplo: 9:00 a 15:00 te falta 1 h; 9:00 a 19:00 acumulás 3 h. El saldo de la semana se va sumando día a día; si al final queda a favor, va al banco.</li>
-    <li><b>Entrada demorada</b> o <b>salida anticipada</b> (con al menos 4 h): figura Presente, computa 7 h y descuenta del banco lo que falta para 7 h.</li>
-    <li>Menos de 4 h trabajadas: <b>Revisar</b>, no computa ni descuenta.</li>
+    <li><b>Entrada demorada</b> o <b>salida anticipada</b> (con al menos 3 h): figura Presente, computa 7 h y descuenta del banco lo que falta para 7 h.</li>
+    <li>Menos de 3 h trabajadas: <b>Revisar</b>, no computa ni descuenta.</li>
     <li><b>Home office</b>: registra el día, no suma horas ni mueve el banco.</li>
     <li><b>Vacaciones, feriado y capacitación</b> justifican el día: figura Presente y cuenta 7 h, sin mover el banco de horas. Vacaciones resta 1 día del banco de vacaciones.</li>
     <li><b>Franco</b> justifica el día (7 h), descuenta 7 h del banco de horas y suma un franco usado de los 15 del año.</li>
     <li><b>Capacitación</b>: 4 obligatorias por año, la app no deja cargar una quinta.</li>
     <li>El banco de horas va de 0 a 70 h: lo que supere 70 h se pierde y nunca queda negativo.</li>
-    <li>Meta semanal: 28 h en 4 días, con al menos 4 h reales cada día.</li>
+    <li>Meta semanal: 28 h en 4 días, con al menos 3 h reales cada día.</li>
   </ul></details>`;
 }
 
@@ -485,7 +485,7 @@ function vistaConfig() {
     <h2 style="font-size:20px;margin:6px 0 12px">Configuración fija</h2>
     <div class="parametros">
       <div><span>Valor de una novedad</span><b>7 h</b></div>
-      <div><span>Mínimo real trabajado</span><b>4 h / día</b></div>
+      <div><span>Mínimo real trabajado</span><b>3 h / día</b></div>
       <div><span>Meta semanal</span><b>28 h</b></div>
       <div><span>Tope banco de horas</span><b>70 h</b></div>
       <div><span>Días laborables</span><b>Lunes a viernes</b></div>
@@ -789,7 +789,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610261602';
+const VERSION = '202610261615';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
