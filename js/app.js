@@ -1,8 +1,8 @@
 import {
-  NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
+  NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610261654';
-import { almacen, registroVacio } from './db.js?v=202610261654';
+} from './calc.js?v=202610262044';
+import { almacen, registroVacio } from './db.js?v=202610262044';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -299,11 +299,12 @@ function vistaBanco() {
   return `
   <section class="grilla-2-par">
     <div class="tarjeta oscura">
-      <p class="rotulo">Saldo actual del banco</p>
+      <p class="rotulo">Horas disponibles para usar</p>
       <p class="cifra" style="font-size:40px">${fmtHoras(b.saldo)} <small>/ 70 h</small></p>
       <div class="barra"><i style="width:${Math.min(100, b.saldo / CFG.topeBancoMin * 100)}%"></i></div>
       <p class="nota">${enTope ? 'Estás en el tope.' : `Podés sumar ${fmtHoras(CFG.topeBancoMin - b.saldo)} más antes del tope.`}</p>
       ${enTope ? '<p class="alerta-tope">El banco está en 70 h: las horas nuevas que se sumen se pierden.</p>' : ''}
+      ${b.reinicio ? `<p class="nota">Calculado desde el ${fechaTxt(b.reinicio)}.</p>` : ''}
     </div>
     <div class="tarjeta">
       <p class="rotulo">Agregar movimiento manual</p>
@@ -318,12 +319,21 @@ function vistaBanco() {
   </section>
   <div class="espacio"></div>
   <section class="tarjeta">
+    <p class="rotulo">Reiniciar y recalcular</p>
+    <p class="nota" style="margin:6px 0 12px">Pone el banco en 0 en la fecha que elijas, borra los movimientos manuales (por ejemplo, los de prueba) y lo vuelve a calcular solo con los días cargados desde esa fecha. Antes se descarga una copia por las dudas.</p>
+    <div class="form-fila" style="grid-template-columns:minmax(130px,200px) auto;justify-content:start">
+      <label>Desde<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="b-reinicio" value="${fechaTxt(b.reinicio || `${new Date().getFullYear()}-01-01`)}"></label>
+      <button class="boton" data-accion="reiniciar-banco">Reiniciar banco</button>
+    </div>
+  </section>
+  <div class="espacio"></div>
+  <section class="tarjeta">
     <div class="bloque-cab">
       <div><p class="rotulo">Historial de movimientos</p><h2>Banco de horas</h2></div>
       <select class="campo" id="sel-anio-banco" style="width:auto" aria-label="Año"><option value="todos">Todos los años</option>${anios.map(a => `<option${a === ui.anioBanco ? ' selected' : ''}>${a}</option>`).join('')}</select>
     </div>
     <div class="stats">
-      <div><span>Sumadas</span><b>${fmtHoras(b.sumadas)}</b></div>
+      <div><span>Ganadas</span><b>${fmtHoras(b.sumadas)}</b></div>
       <div><span>Utilizadas</span><b>${fmtHoras(b.usadas)}</b></div>
       <div><span>Perdidas por tope</span><b>${fmtHoras(b.perdidas)}</b></div>
       <div><span>Sin descontar (banco en 0)</span><b>${fmtHoras(b.sinDescontar)}</b></div>
@@ -680,6 +690,20 @@ document.addEventListener('click', async ev => {
       } catch (e) { toast(e.message, true); }
       render(); break;
     }
+    case 'reiniciar-banco': {
+      const fecha = isoDe($('#b-reinicio'));
+      if (!fecha) { toast('Indicá desde qué fecha recalcular', true); break; }
+      const manuales = almacen.datos.movimientos.filter(m => m.banco === 'horas');
+      const nMan = manuales.filter(m => m.concepto !== REINICIO).length;
+      if (!confirm(`Se descarga una copia, se ${nMan === 1 ? 'borra 1 movimiento manual' : `borran ${nMan} movimientos manuales`} del banco y se recalcula desde 0 con los días cargados desde el ${fechaTxt(fecha)}. ¿Seguimos?`)) break;
+      exportar();
+      try {
+        for (const m of manuales) await almacen.borrarMovimiento(m.id);
+        await almacen.agregarMovimiento({ fecha, banco: 'horas', cantidad: 0, concepto: REINICIO });
+        toast(`Banco recalculado desde el ${fechaTxt(fecha)}: ${fmtHoras(libroBancoHoras(almacen.datos.registros, almacen.datos.movimientos, CFG).saldo, { vacio: '0 h' })} disponibles`);
+      } catch (e) { toast(e.message, true); }
+      render(); break;
+    }
     case 'descargar-nov': {
       // Planilla (se abre con Excel) con los días cargados de la novedad elegida en el año elegido.
       const { tipo, anio } = ui.nov, todas = tipo === 'Quitar novedad';
@@ -871,7 +895,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610261654';
+const VERSION = '202610262044';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {

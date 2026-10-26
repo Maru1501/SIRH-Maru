@@ -145,6 +145,8 @@ export function calcularSemana(lunesIso, registros, cfg = CONFIG_DEFAULT) {
     faltanDias: Math.max(0, diasMeta - cumplidos), falta: Math.max(0, meta - computadas) };
 }
 
+export const REINICIO = 'Reinicio del banco';
+
 // Libro del banco de horas. movimientos manuales: {id, fecha, banco:'horas', minutos, concepto}
 export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
   const eventos = [];
@@ -166,6 +168,9 @@ export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
     }
   }
   eventos.sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.orden - b.orden);
+  // "Reinicio del banco": el banco arranca en 0 en esa fecha y solo cuenta lo que pasa desde ahí.
+  const reinicio = (movimientos || []).filter(m => m.banco === 'horas' && m.concepto === REINICIO).map(m => m.fecha).sort().pop();
+  if (reinicio) eventos.splice(0, eventos.length, ...eventos.filter(e => e.fecha >= reinicio && e.concepto !== REINICIO));
 
   let saldo = 0, perdidas = 0, sinDescontar = 0, sumadas = 0, usadas = 0;
   for (const ev of eventos) {
@@ -181,7 +186,7 @@ export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
     saldo += ev.aplicado;
     ev.saldo = saldo;
   }
-  return { eventos, saldo, perdidas, sinDescontar, sumadas, usadas };
+  return { eventos, saldo, perdidas, sinDescontar, sumadas, usadas, reinicio };
 }
 
 // Libro del banco de vacaciones (en días)

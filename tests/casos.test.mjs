@@ -122,4 +122,10 @@ caso('Falta una hora → No Entrada / No Salida', () => {
 caso('Salida anterior a entrada → error', () => {
   assert.equal(calcularDia({ entrada: '17:00', salida: '10:00' }).estado, 'Revisar horario');
 });
+caso('Reinicio del banco: arranca en 0 y solo cuenta desde esa fecha', () => {
+  const regs = { '2026-01-05': { entrada: '08:00', salida: '17:00' }, '2026-03-02': { entrada: '08:00', salida: '18:00' } };
+  const movs = [{ banco: 'horas', fecha: '2026-01-02', cantidad: h(50), concepto: 'Prueba' }, { banco: 'horas', fecha: '2026-02-01', cantidad: 0, concepto: 'Reinicio del banco' }];
+  const b = libroBancoHoras(regs, movs);
+  assert.equal(b.saldo, h(3)); assert.equal(b.reinicio, '2026-02-01');
+});
 console.log(`\n${ok} casos OK`);
