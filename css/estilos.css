@@ -308,3 +308,8 @@ details.mes-banco summary .sub { grid-column: 1 / -1; font-size: 11.5px; color: 
 details.mes-banco .tabla-scroll { padding-bottom: 10px; }
 @media (max-width: 560px) { details.mes-banco summary { grid-template-columns: 1fr 1fr 1fr; } details.mes-banco summary .mb-mes { grid-column: 1 / -1; } }
 .meses-banco { margin-top: 10px; }
+.col-plegables { display: grid; gap: 14px; align-content: start; }
+details.plegable > summary { cursor: pointer; list-style: none; margin: 0; }
+details.plegable > summary::-webkit-details-marker { display: none; }
+details.plegable > summary::before { content: '▸'; display: inline-block; width: 1.2em; transition: transform .15s; }
+details.plegable[open] > summary::before { transform: rotate(90deg); }

@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO, saldoInicialNecesario,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610262118';
-import { almacen, registroVacio } from './db.js?v=202610262118';
+} from './calc.js?v=202610262126';
+import { almacen, registroVacio } from './db.js?v=202610262126';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -313,8 +313,9 @@ function vistaBanco() {
         <button class="boton" style="margin-top:8px" data-accion="saldo-inicial" data-fecha="${desde}" data-min="${necesario}">Cargar ${fmtHoras(necesario)} como saldo inicial</button>`;
       })() : ''}
     </div>
-    <div class="tarjeta">
-      <p class="rotulo">Agregar movimiento manual</p>
+    <div class="col-plegables">
+    <details class="tarjeta plegable" data-mes="p-manual"${ui.mesesBanco.has('p-manual') ? ' open' : ''}>
+      <summary class="rotulo">Agregar movimiento manual</summary>
       <p class="nota" style="margin:6px 0 12px">Para cargar el saldo inicial o corregir algo. Usá horas como 5, 2,5 o 1:30. Para restar, poné un signo menos.</p>
       <div class="form-fila">
         <label>Fecha<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="m-fecha" value="${fechaTxt(hoyIso())}"></label>
@@ -322,15 +323,15 @@ function vistaBanco() {
         <label style="grid-column:span 2">Concepto<input class="campo" type="text" id="m-concepto" placeholder="Saldo inicial" maxlength="120"></label>
         <button class="boton principal" data-accion="agregar-horas">Agregar</button>
       </div>
-    </div>
-  </section>
-  <div class="espacio"></div>
-  <section class="tarjeta">
-    <p class="rotulo">Reiniciar y recalcular</p>
+    </details>
+    <details class="tarjeta plegable" data-mes="p-reinicio"${ui.mesesBanco.has('p-reinicio') ? ' open' : ''}>
+      <summary class="rotulo">Reiniciar y recalcular</summary>
     <p class="nota" style="margin:6px 0 12px">Pone el banco en 0 en la fecha que elijas, borra los movimientos manuales (por ejemplo, los de prueba) y lo vuelve a calcular solo con los días cargados desde esa fecha. Antes se descarga una copia por las dudas.</p>
     <div class="form-fila" style="grid-template-columns:minmax(130px,200px) auto;justify-content:start">
       <label>Desde<input class="campo fecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" autocomplete="off" id="b-reinicio" value="${fechaTxt(b.reinicio || `${new Date().getFullYear()}-01-01`)}"></label>
       <button class="boton" data-accion="reiniciar-banco">Reiniciar banco</button>
+    </div>
+    </details>
     </div>
   </section>
   <div class="espacio"></div>
@@ -389,7 +390,7 @@ function historialBanco(eventos) {
 }
 document.addEventListener('toggle', ev => {
   const d = ev.target;
-  if (d.classList?.contains('mes-banco')) { if (d.open) ui.mesesBanco.add(d.dataset.mes); else ui.mesesBanco.delete(d.dataset.mes); }
+  if (d.classList?.contains('mes-banco') || d.classList?.contains('plegable')) { if (d.open) ui.mesesBanco.add(d.dataset.mes); else ui.mesesBanco.delete(d.dataset.mes); }
 }, true);
 
 // ---------- Vacaciones ----------
@@ -943,7 +944,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610262118';
+const VERSION = '202610262126';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
