@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=20261023d';
-import { almacen, registroVacio } from './db.js?v=20261023d';
+} from './calc.js?v=20261026a';
+import { almacen, registroVacio } from './db.js?v=20261026a';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -88,8 +88,8 @@ function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
   const listo = !plegada && (completo || ui.abiertos.has(fecha)) ? `<div class="c-listo"><button class="boton" data-cerrar="${fecha}">Listo ✓</button></div>` : '';
   return `<div class="fila${hoy ? ' hoy' : ''}${sucia ? ' sucia' : ''}${plegada ? ' plegada' : ''}" data-fecha="${fecha}">${resumen}
     <div class="c-dia dia"><b>${nombreDia(fecha)} ${dd_mm(fecha)}</b>${hoy ? '<span class="etq">HOY</span>' : ''}${avisos}</div>
-    <div class="c-ent"><span class="lbl-movil">Entrada</span><input class="campo" type="time" data-campo="entrada" value="${esc(r.entrada)}" aria-label="Entrada ${fecha}"></div>
-    <div class="c-sal"><span class="lbl-movil">Salida</span><input class="campo" type="time" data-campo="salida" value="${esc(r.salida)}" aria-label="Salida ${fecha}"></div>
+    <div class="c-ent"><span class="lbl-movil">Entrada</span><input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" data-campo="entrada" value="${esc(r.entrada)}" aria-label="Entrada ${fecha}"></div>
+    <div class="c-sal"><span class="lbl-movil">Salida</span><input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" data-campo="salida" value="${esc(r.salida)}" aria-label="Salida ${fecha}"></div>
     <div class="c-nov"><span class="lbl-movil">Novedad</span><select class="campo" data-campo="novedad" aria-label="Novedad ${fecha}">${opcionesNovedad(r.novedad || 'Sin novedad')}</select></div>
     <div class="c-nota"><span class="lbl-movil">Nota</span><input class="campo" type="text" data-campo="nota" value="${esc(r.nota)}" placeholder="Nota" maxlength="200" aria-label="Nota ${fecha}"></div>
     <div class="c-trab"><span class="lbl-movil">Trabajadas</span><span class="num ${c.trabajadas ? 'ocre' : 'gris'}">${fmtHoras(c.trabajadas || null)}</span></div>
@@ -256,8 +256,8 @@ function vistaAnual() {
       <div class="form-fila" style="margin-top:12px">
         <label>Desde<input class="campo" type="date" id="r-desde" value="${R.desde}"></label>
         <label>Hasta<input class="campo" type="date" id="r-hasta" value="${R.hasta}"></label>
-        <label>Entrada<input class="campo" type="time" id="r-entrada" value="${R.entrada}"></label>
-        <label>Salida<input class="campo" type="time" id="r-salida" value="${R.salida}"></label>
+        <label>Entrada<input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" id="r-entrada" value="${R.entrada}"></label>
+        <label>Salida<input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" id="r-salida" value="${R.salida}"></label>
         <label>Novedad<select class="campo" id="r-novedad">${opcionesNovedad(R.novedad)}</select></label>
         <label class="check"><input type="checkbox" id="r-vacios"${R.soloVacios ? ' checked' : ''}> Solo días vacíos</label>
         <button class="boton" data-accion="aplicar-rango">Aplicar</button>
@@ -724,6 +724,46 @@ document.addEventListener('pointerdown', async ev => {
   if (document.activeElement && fila.contains(document.activeElement)) document.activeElement.blur();
   await aplicarFila(fila);
 });
+
+// ---------- carga de horas con teclado ----------
+// Mientras se escribe: solo números y los dos puntos se ponen solos (1030 → 10:30, 930 → 09:30).
+function formatearMientras(txt) {
+  let d = txt.replace(/\D/g, '').slice(0, 4);
+  if (d && +d[0] > 2) d = ('0' + d).slice(0, 4);
+  return d.length > 2 ? `${d.slice(0, 2)}:${d.slice(2)}` : d;
+}
+// Al terminar: completa lo que falta (10 → 10:00, 10:3 → 10:30) y valida.
+export function normalizarHora(txt) {
+  const d = String(txt || '').replace(/\D/g, '');
+  if (!d) return '';
+  let h, m;
+  if (d.length <= 2) { h = +d; m = 0; }
+  else if (d.length === 3 && +d[0] > 2) { h = +d[0]; m = +d.slice(1); }
+  else { h = +d.slice(0, 2); m = +(d.slice(2, 4) + '0').slice(0, 2); }
+  if (h > 23 || m > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+document.addEventListener('input', ev => {
+  const el = ev.target;
+  if (!el.classList || !el.classList.contains('hora')) return;
+  const borrando = ev.inputType && ev.inputType.startsWith('delete');
+  if (!borrando) el.value = formatearMientras(el.value);
+  if (!borrando && el.value.length === 5) {
+    // hora completa: pasar al campo siguiente
+    const fila = el.closest('[data-fecha]');
+    if (fila && el.dataset.campo === 'entrada') $('[data-campo=salida]', fila)?.focus();
+    else if (el.id === 'r-entrada') $('#r-salida')?.focus();
+    else el.blur();
+  }
+});
+document.addEventListener('change', ev => {
+  const el = ev.target;
+  if (!el.classList || !el.classList.contains('hora')) return;
+  const n = normalizarHora(el.value);
+  if (n === null) { toast('Hora inválida. Escribila como 1030 o 10:30', true); el.value = ''; }
+  else el.value = n;
+}, true);
+document.addEventListener('focusin', ev => { if (ev.target.classList?.contains('hora')) ev.target.select(); });
 
 window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).length) { e.preventDefault(); e.returnValue = ''; } });
 
