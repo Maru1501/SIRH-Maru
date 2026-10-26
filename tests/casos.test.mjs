@@ -111,6 +111,10 @@ caso('Vacaciones: +30 cada 1/1 y se acumulan (5 que sobran + 30 = 35)', () => {
   const v27 = libroBancoVacaciones(regs, [{ banco: 'vacaciones', fecha: '2026-01-01', cantidad: 5 - (30 - usados), concepto: 'Ajuste' }], undefined, new Date(2027, 0, 2));
   assert.equal(v27.saldo, 35);
 });
+caso('Ausencia por fuerza mayor: Presente, 7 h, sin banco', () => {
+  const c = calcularDia({ novedad: 'Ausencia por fuerza mayor' });
+  assert.equal(c.computadas, h(7)); assert.equal(c.descuento, 0); assert.match(c.estado, /^Presente/);
+});
 caso('Falta una hora → No Entrada / No Salida', () => {
   assert.equal(calcularDia({ salida: '17:00' }).estado, 'No Entrada');
   assert.equal(calcularDia({ entrada: '10:00' }).estado, 'No Salida');

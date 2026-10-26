@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610261615';
-import { almacen, registroVacio } from './db.js?v=202610261615';
+} from './calc.js?v=202610261626';
+import { almacen, registroVacio } from './db.js?v=202610261626';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -84,7 +84,7 @@ function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
       <span class="rd-h num">${fmtHoras(c.justificado ? null : c.trabajadas || null)}</span>
       ${c.diferencia !== undefined && c.tono === 'ok'
         ? `<span class="estado ${c.diferencia < 0 ? 'malo' : 'ok'}">${c.diferencia === 0 ? '0 h' : fmtHoras(c.diferencia, { signo: true })}</span>`
-        : `<span class="estado ${c.tono}">${esc((c.estado || '').replace(/^Presente \((.*)\)$/, '$1').replace(/^./, x => x.toUpperCase()))}</span>`}
+        : `<span class="estado ${c.tono}">${esc((c.estado || '').replace(/^Presente \((.*)\)$/, '$1').replace('ausencia por fuerza mayor', 'fuerza mayor').replace(/^./, x => x.toUpperCase()))}</span>`}
     </button>` : '';
   const listo = !plegada && (completo || ui.abiertos.has(fecha)) ? `<div class="c-listo"><button class="boton" data-cerrar="${fecha}">Listo ✓</button></div>` : '';
   return `<div class="fila${hoy ? ' hoy' : ''}${sucia ? ' sucia' : ''}${plegada ? ' plegada' : ''}" data-fecha="${fecha}">${resumen}
@@ -225,7 +225,7 @@ function ayuda() {
     <li><b>Entrada demorada</b> o <b>salida anticipada</b> (con al menos 3 h): figura Presente, computa 7 h y descuenta del banco lo que falta para 7 h.</li>
     <li>Menos de 3 h trabajadas: <b>Revisar</b>, no computa ni descuenta.</li>
     <li><b>Home office</b>: registra el día, no suma horas ni mueve el banco.</li>
-    <li><b>Vacaciones, feriado y capacitación</b> justifican el día: figura Presente y cuenta 7 h, sin mover el banco de horas. Vacaciones resta 1 día del banco de vacaciones.</li>
+    <li><b>Vacaciones, feriado, capacitación y ausencia por fuerza mayor</b> justifican el día: figura Presente y cuenta 7 h, sin mover el banco de horas. Vacaciones resta 1 día del banco de vacaciones.</li>
     <li><b>Franco</b> justifica el día (7 h), descuenta 7 h del banco de horas y suma un franco usado de los 15 del año.</li>
     <li><b>Capacitación</b>: 4 obligatorias por año, la app no deja cargar una quinta.</li>
     <li>El banco de horas va de 0 a 70 h: lo que supere 70 h se pierde y nunca queda negativo.</li>
@@ -340,7 +340,7 @@ function vistaBanco() {
 }
 
 // ---------- Vacaciones ----------
-const NOV_PERIODO = ['Vacaciones', 'Franco', 'Capacitación', 'Feriado', 'Home office'];
+const NOV_PERIODO = ['Vacaciones', 'Franco', 'Capacitación', 'Feriado', 'Home office', 'Ausencia por fuerza mayor'];
 
 function diasHabiles(desde, hasta) {
   const out = [];
@@ -553,7 +553,7 @@ $('#velo').addEventListener('click', () => menu(false));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') menu(false); });
 
 // Pone el cursor en la entrada del primer día sin cargar (para cargar todo con el teclado).
-const DIA_COMPLETO_NOV = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office'];
+const DIA_COMPLETO_NOV = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office', 'Ausencia por fuerza mayor'];
 function enfocarPendiente() {
   for (const fila of $$('#vista .fila[data-fecha]')) {
     const ent = $('[data-campo=entrada]', fila), sal = $('[data-campo=salida]', fila), nov = $('[data-campo=novedad]', fila);
@@ -789,7 +789,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610261615';
+const VERSION = '202610261626';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {

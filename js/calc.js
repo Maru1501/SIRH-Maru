@@ -2,7 +2,7 @@
 
 export const NOVEDADES = [
   'Sin novedad', 'Vacaciones', 'Franco', 'Feriado',
-  'Entrada Demorada', 'Salida Anticipada', 'Capacitación', 'Home office',
+  'Entrada Demorada', 'Salida Anticipada', 'Capacitación', 'Home office', 'Ausencia por fuerza mayor',
 ];
 
 export const CONFIG_DEFAULT = {
@@ -20,7 +20,7 @@ export const CONFIG_DEFAULT = {
   salidaMaxMin: 19 * 60, // la salida cuenta como máximo hasta las 19:00
 };
 
-const DIA_COMPLETO = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office'];
+const DIA_COMPLETO = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office', 'Ausencia por fuerza mayor'];
 const JUSTIFICA_FALTANTE = ['Entrada Demorada', 'Salida Anticipada'];
 
 export function aMinutos(hhmm) {
