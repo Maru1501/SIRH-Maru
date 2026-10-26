@@ -159,7 +159,9 @@ export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
     const c = calcularDia(rec, cfg);
     semanas.add(iso(lunesDe(desdeIso(fecha))));
     if (c.credito > 0) eventos.push({ fecha, orden: 1, concepto: 'Excedente del día', pedido: c.credito });
-    if (c.descuento > 0) eventos.push({ fecha, orden: 2, concepto: `Descuento · ${c.novedad}`, pedido: -c.descuento });
+    // Con saldo semanal, lo que se descuenta en la semana se aplica después de sumar lo ganado esa misma semana.
+    const fin = cfg.excedenteSemanal ? iso(sumarDias(lunesDe(desdeIso(fecha)), 4)) : fecha;
+    if (c.descuento > 0) eventos.push({ fecha: fin, dia: fecha, orden: 4, concepto: `Descuento · ${c.novedad}`, pedido: -c.descuento });
   }
   if (cfg.excedenteSemanal) {
     for (const lunes of semanas) {
@@ -167,7 +169,7 @@ export function libroBancoHoras(registros, movimientos, cfg = CONFIG_DEFAULT) {
       if (sem.credito > 0) eventos.push({ fecha: iso(sumarDias(desdeIso(lunes), 4)), orden: 3, concepto: 'Excedente semanal', pedido: sem.credito });
     }
   }
-  eventos.sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.orden - b.orden);
+  eventos.sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.orden - b.orden || ((a.dia || '') < (b.dia || '') ? -1 : 1));
   // "Reinicio del banco": el banco arranca en 0 en esa fecha y solo cuenta lo que pasa desde ahí.
   const reinicio = (movimientos || []).filter(m => m.banco === 'horas' && m.concepto === REINICIO).map(m => m.fecha).sort().pop();
   if (reinicio) eventos.splice(0, eventos.length, ...eventos.filter(e => e.fecha >= reinicio && e.concepto !== REINICIO));

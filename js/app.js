@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610262044';
-import { almacen, registroVacio } from './db.js?v=202610262044';
+} from './calc.js?v=202610262051';
+import { almacen, registroVacio } from './db.js?v=202610262051';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -305,6 +305,7 @@ function vistaBanco() {
       <p class="nota">${enTope ? 'Estás en el tope.' : `Podés sumar ${fmtHoras(CFG.topeBancoMin - b.saldo)} más antes del tope.`}</p>
       ${enTope ? '<p class="alerta-tope">El banco está en 70 h: las horas nuevas que se sumen se pierden.</p>' : ''}
       ${b.reinicio ? `<p class="nota">Calculado desde el ${fechaTxt(b.reinicio)}.</p>` : ''}
+      ${b.sinDescontar ? `<p class="alerta-tope">Hay ${fmtHoras(b.sinDescontar)} de francos o demoras que no se pudieron descontar porque el banco estaba en 0. Si arrancaste el año con horas guardadas, cargalas como saldo inicial al 01/01 en "Agregar movimiento manual".</p>` : ''}
     </div>
     <div class="tarjeta">
       <p class="rotulo">Agregar movimiento manual</p>
@@ -341,7 +342,7 @@ function vistaBanco() {
     ${lista.length ? `<div class="tabla-scroll"><table class="historial">
       <thead><tr><th>Fecha</th><th>Concepto</th><th class="der">Horas</th><th class="der">Saldo</th><th></th></tr></thead>
       <tbody>${lista.map(e => `<tr>
-        <td>${fechaCorta(e.fecha)}</td>
+        <td>${fechaCorta(e.dia || e.fecha)}</td>
         <td>${esc(e.concepto)}${e.perdido ? `<span class="sub">${fmtHoras(e.perdido)} perdidas por tope</span>` : ''}${e.noDescontado ? `<span class="sub">${fmtHoras(e.noDescontado)} sin descontar: el banco no puede quedar negativo</span>` : ''}</td>
         <td class="der ${e.aplicado < 0 ? 'num neg' : 'num pos'}">${fmtHoras(e.aplicado, { signo: true, vacio: '0 h' }) || '0 h'}</td>
         <td class="der">${fmtHoras(e.saldo)}</td>
@@ -895,7 +896,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610262044';
+const VERSION = '202610262051';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
