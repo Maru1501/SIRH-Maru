@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO, saldoInicialNecesario,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610262117';
-import { almacen, registroVacio } from './db.js?v=202610262117';
+} from './calc.js?v=202610262118';
+import { almacen, registroVacio } from './db.js?v=202610262118';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -349,7 +349,7 @@ function vistaBanco() {
   </section>`;
 }
 
-// Historial: de lo más nuevo a lo más viejo; un renglón por mes (se abre) con el detalle por semana y la carga inicial al final.
+// Historial: de lo más nuevo a lo más viejo; un renglón por mes (se abre) con sus movimientos y la carga inicial al final.
 const esInicial = e => e.manual && /^saldo inicial/i.test(e.concepto || '');
 function filaMov(e) {
   return `<tr>
@@ -374,9 +374,7 @@ function historialBanco(eventos) {
     <span class="num">${fmtHoras(sum(iniciales, e => e.aplicado), { vacio: '0 h' }) || '0 h'}${iniciales.map(e => ` <button class="enlace" data-borrar-mov="${e.id}" title="Borrar carga inicial">✕</button>`).join('')}</span></div>`;
   const filas = [...meses].reverse().map(([k, l]) => {
     const gan = sum(l, e => Math.max(0, e.aplicado)), usa = sum(l, e => Math.max(0, -e.aplicado)), perd = sum(l, e => e.perdido || 0);
-    const semanas = new Map();
-    for (const e of l) { const w = iso(lunesDe(desdeIso(e.dia || e.fecha))); if (!semanas.has(w)) semanas.set(w, []); semanas.get(w).push(e); }
-    const detalle = [...semanas].reverse().map(([w, le]) => `<tr class="sem-fila"><td colspan="2">Semana del ${fechaCorta(w)}</td><td class="der">${fmtHoras(sum(le, e => e.aplicado), { signo: true, vacio: '0 h' }) || '0 h'}</td><td class="der">${fmtHoras(le.at(-1).saldo)}</td><td></td></tr>${le.slice().reverse().map(filaMov).join('')}`).join('');
+    const detalle = l.slice().reverse().map(filaMov).join('');
     const [a, m] = k.split('-');
     return `<details class="mes-banco" data-mes="${k}"${ui.mesesBanco.has(k) ? ' open' : ''}>
       <summary><span class="mb-mes">${MESES[+m - 1][0].toUpperCase() + MESES[+m - 1].slice(1)} ${a}</span>
@@ -945,7 +943,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610262117';
+const VERSION = '202610262118';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {

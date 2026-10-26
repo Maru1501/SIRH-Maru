@@ -306,6 +306,5 @@ details.mes-banco summary .mb-dato { text-align: right; font-variant-numeric: ta
 details.mes-banco summary .mb-dato small { display: block; font-size: 11px; color: var(--texto-3); }
 details.mes-banco summary .sub { grid-column: 1 / -1; font-size: 11.5px; color: var(--ocre); }
 details.mes-banco .tabla-scroll { padding-bottom: 10px; }
-tr.sem-fila td { background: var(--fondo-2, rgba(0,0,0,.035)); font-weight: 600; font-size: 12.5px; }
 @media (max-width: 560px) { details.mes-banco summary { grid-template-columns: 1fr 1fr 1fr; } details.mes-banco summary .mb-mes { grid-column: 1 / -1; } }
 .meses-banco { margin-top: 10px; }
