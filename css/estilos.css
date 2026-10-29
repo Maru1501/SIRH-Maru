@@ -313,3 +313,7 @@ details.plegable > summary { cursor: pointer; list-style: none; margin: 0; }
 details.plegable > summary::-webkit-details-marker { display: none; }
 details.plegable > summary::before { content: '▸'; display: inline-block; width: 1.2em; transition: transform .15s; }
 details.plegable[open] > summary::before { transform: rotate(90deg); }
+
+/* Fichadas: la hora viene del reloj y queda fija */
+.campo.fichada { background: #eef6ee; color: #1f5130; border-color: #b7d8bf; font-weight: 600; cursor: not-allowed; }
+.marca-fichada { margin-left: 4px; font-size: 13px; }
