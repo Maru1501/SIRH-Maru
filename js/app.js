@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO, saldoInicialNecesario,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610292130';
-import { almacen, registroVacio } from './db.js?v=202610292130';
+} from './calc.js?v=202610292215';
+import { almacen, registroVacio } from './db.js?v=202610292215';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -101,7 +101,7 @@ function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
   const avisos = todosAvisos.length ? `<div class="aviso-dia">${esc(todosAvisos.join(' · '))}</div>` : '';
   const completo = diaCompleto(r, c);
   const plegada = (completo || plegarVacio) && !ui.abiertos.has(fecha);
-  const detalle = c.justificado ? r.novedad
+  const detalle = c.justificado ? (r.entrada || r.salida ? `${r.entrada || '--:--'}–${r.salida || '--:--'} · ${r.novedad}` : r.novedad)
     : completo ? `${r.entrada}–${r.salida}${r.novedad && r.novedad !== 'Sin novedad' ? ' · ' + r.novedad : ''}`
     : c.vacio ? 'Tocá para cargar' : `${r.entrada || '--:--'}–${r.salida || '--:--'}`;
   const resumen = plegada ? `<button class="res-dia" data-abrir="${fecha}" aria-label="Editar ${nombreDia(fecha)} ${dd_mm(fecha)}">
@@ -642,7 +642,7 @@ $('#velo').addEventListener('click', () => menu(false));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') menu(false); });
 
 // Pone el cursor en la entrada del primer día sin cargar (para cargar todo con el teclado).
-const DIA_COMPLETO_NOV = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office', 'Ausencia por fuerza mayor'];
+const DIA_COMPLETO_NOV = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office', 'Ausencia por fuerza mayor', 'Justificado'];
 function enfocarPendiente() {
   for (const fila of $$('#vista .fila[data-fecha]')) {
     const ent = $('[data-campo=entrada]', fila), sal = $('[data-campo=salida]', fila), nov = $('[data-campo=novedad]', fila);
@@ -968,7 +968,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610292130';
+const VERSION = '202610292215';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {

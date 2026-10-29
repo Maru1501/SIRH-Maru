@@ -3,6 +3,7 @@
 export const NOVEDADES = [
   'Sin novedad', 'Vacaciones', 'Franco', 'Feriado',
   'Entrada Demorada', 'Salida Anticipada', 'Capacitación', 'Home office', 'Ausencia por fuerza mayor',
+  'Justificado',
 ];
 
 export const CONFIG_DEFAULT = {
@@ -20,7 +21,8 @@ export const CONFIG_DEFAULT = {
   salidaMaxMin: 19 * 60, // la salida cuenta como máximo hasta las 19:00
 };
 
-const DIA_COMPLETO = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office', 'Ausencia por fuerza mayor'];
+// Justificado: el reloj no tomó una fichada y RRHH lo justifica (Presente, 7 h). Las horas cargadas quedan a la vista.
+const DIA_COMPLETO = ['Vacaciones', 'Franco', 'Feriado', 'Capacitación', 'Home office', 'Ausencia por fuerza mayor', 'Justificado'];
 const JUSTIFICA_FALTANTE = ['Entrada Demorada', 'Salida Anticipada'];
 
 export function aMinutos(hhmm) {
