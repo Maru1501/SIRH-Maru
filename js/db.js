@@ -1,4 +1,6 @@
 // Guardado: siempre en el navegador y, si está configurado, en Neon (PostgreSQL).
+// Fichadas: las sube _local/sync_fichadas.php a entrada_fichada / salida_fichada.
+// Cuando hay fichada, esa hora manda y no se puede cambiar desde la app.
 import { neon } from './vendor/neon.mjs';
 
 const LS_DATOS = 'sirh-maru:datos';
@@ -12,13 +14,26 @@ function leerLocal() {
 }
 function escribirLocal(d) { try { localStorage.setItem(LS_DATOS, JSON.stringify(d)); } catch {} }
 
-export function registroVacio(r) { return !r || (!r.entrada && !r.salida && (!r.novedad || r.novedad === 'Sin novedad') && !r.nota); }
+export function registroVacio(r) { return !r || (!r.entrada && !r.salida && !r.entradaFichada && !r.salidaFichada && (!r.novedad || r.novedad === 'Sin novedad') && !r.nota); }
+
+// Registro como lo guarda la app: la hora fichada manda sobre la cargada a mano.
+function limpiar(r, previo) {
+  const entradaFichada = r.entradaFichada || previo?.entradaFichada || '';
+  const salidaFichada = r.salidaFichada || previo?.salidaFichada || '';
+  return {
+    entrada: entradaFichada || r.entrada || '', salida: salidaFichada || r.salida || '',
+    novedad: r.novedad || 'Sin novedad', nota: r.nota || '', entradaFichada, salidaFichada,
+  };
+}
 
 const ESQUEMA = [
   `create table if not exists sirh_registros (
      fecha date primary key, entrada text, salida text,
      novedad text not null default 'Sin novedad', nota text,
      actualizado timestamptz not null default now())`,
+  `alter table sirh_registros add column if not exists entrada_fichada text`,
+  `alter table sirh_registros add column if not exists salida_fichada text`,
+  `create table if not exists sirh_sync (clave text primary key, valor text, actualizado timestamptz not null default now())`,
   `create table if not exists sirh_movimientos (
      id text primary key, fecha date not null,
      banco text not null check (banco in ('horas','vacaciones')),
@@ -26,12 +41,19 @@ const ESQUEMA = [
      creado timestamptz not null default now())`,
 ];
 
-const SQL_UPSERT = `insert into sirh_registros (fecha, entrada, salida, novedad, nota, actualizado)
+// La hora fichada (entrada_fichada / salida_fichada) no la pisa la app.
+const SQL_UPSERT = `insert into sirh_registros (fecha, entrada, salida, novedad, nota, entrada_fichada, salida_fichada, actualizado)
   select (x->>'fecha')::date, nullif(x->>'entrada',''), nullif(x->>'salida',''),
-         coalesce(nullif(x->>'novedad',''),'Sin novedad'), nullif(x->>'nota',''), now()
+         coalesce(nullif(x->>'novedad',''),'Sin novedad'), nullif(x->>'nota',''),
+         nullif(x->>'entradaFichada',''), nullif(x->>'salidaFichada',''), now()
   from json_array_elements($1::json) x
-  on conflict (fecha) do update set entrada = excluded.entrada, salida = excluded.salida,
-    novedad = excluded.novedad, nota = excluded.nota, actualizado = now()`;
+  on conflict (fecha) do update set
+    entrada = coalesce(sirh_registros.entrada_fichada, excluded.entrada),
+    salida  = coalesce(sirh_registros.salida_fichada, excluded.salida),
+    novedad = excluded.novedad, nota = excluded.nota,
+    entrada_fichada = coalesce(sirh_registros.entrada_fichada, excluded.entrada_fichada),
+    salida_fichada  = coalesce(sirh_registros.salida_fichada, excluded.salida_fichada),
+    actualizado = now()`;
 
 const SQL_MOVS = `insert into sirh_movimientos (id, fecha, banco, cantidad, concepto)
   select x->>'id', (x->>'fecha')::date, x->>'banco', (x->>'cantidad')::numeric, x->>'concepto'
@@ -42,6 +64,7 @@ const SQL_MOVS = `insert into sirh_movimientos (id, fecha, banco, cantidad, conc
 class Almacen {
   constructor() {
     this.datos = leerLocal();
+    this.sync = null; // { hasta: 'AAAA-MM-DD', al: fecha y hora de la última sincronización de fichadas }
     this.sql = null;
     this.estado = 'local'; // local | conectando | nube | error
     this.error = '';
@@ -86,10 +109,14 @@ class Almacen {
   }
 
   async bajar() {
-    const regs = await this.sql.query(`select fecha::text as fecha, entrada, salida, novedad, nota from sirh_registros order by fecha`);
+    const regs = await this.sql.query(`select fecha::text as fecha, entrada, salida, novedad, nota, entrada_fichada, salida_fichada from sirh_registros order by fecha`);
+    try {
+      const s = await this.sql.query(`select valor from sirh_sync where clave = 'fichadas'`);
+      this.sync = s.length ? JSON.parse(s[0].valor) : null;
+    } catch { this.sync = null; }
     const movs = await this.sql.query(`select id, fecha::text as fecha, banco, cantidad::float8 as cantidad, concepto from sirh_movimientos order by fecha, creado`);
     const registros = {};
-    for (const r of regs) registros[r.fecha] = { entrada: r.entrada || '', salida: r.salida || '', novedad: r.novedad || 'Sin novedad', nota: r.nota || '' };
+    for (const r of regs) registros[r.fecha] = limpiar({ entrada: r.entrada, salida: r.salida, novedad: r.novedad, nota: r.nota, entradaFichada: r.entrada_fichada, salidaFichada: r.salida_fichada });
     return { registros, movimientos: movs.map(m => ({ ...m, cantidad: Number(m.cantidad) })) };
   }
 
@@ -111,13 +138,14 @@ class Almacen {
   async guardarRegistros(cambios) {
     const subir = [], borrar = [];
     for (const [fecha, r] of Object.entries(cambios)) {
-      if (registroVacio(r)) { delete this.datos.registros[fecha]; borrar.push(fecha); }
-      else { const limpio = { entrada: r.entrada || '', salida: r.salida || '', novedad: r.novedad || 'Sin novedad', nota: r.nota || '' }; this.datos.registros[fecha] = limpio; subir.push({ fecha, ...limpio }); }
+      const limpio = limpiar(r, this.datos.registros[fecha]);
+      if (registroVacio(limpio)) { delete this.datos.registros[fecha]; borrar.push(fecha); }
+      else { this.datos.registros[fecha] = limpio; subir.push({ fecha, ...limpio }); }
     }
     escribirLocal(this.datos);
     await this.enNube(async sql => {
       for (let i = 0; i < subir.length; i += 200) await sql.query(SQL_UPSERT, [JSON.stringify(subir.slice(i, i + 200))]);
-      if (borrar.length) await sql.query(`delete from sirh_registros where fecha = any($1::date[])`, [borrar]);
+      if (borrar.length) await sql.query(`delete from sirh_registros where fecha = any($1::date[]) and entrada_fichada is null and salida_fichada is null`, [borrar]);
     });
   }
 
@@ -150,7 +178,7 @@ class Almacen {
   async importar(obj) {
     if (!obj || typeof obj.registros !== 'object') throw new Error('El archivo no parece una copia de esta app');
     const registros = {};
-    for (const [f, r] of Object.entries(obj.registros)) if (/^\d{4}-\d{2}-\d{2}$/.test(f) && !registroVacio(r)) registros[f] = { entrada: r.entrada || '', salida: r.salida || '', novedad: r.novedad || 'Sin novedad', nota: r.nota || '' };
+    for (const [f, r] of Object.entries(obj.registros)) if (/^\d{4}-\d{2}-\d{2}$/.test(f) && !registroVacio(r)) registros[f] = limpiar(r);
     const movimientos = (obj.movimientos || []).filter(m => m && m.fecha && (m.banco === 'horas' || m.banco === 'vacaciones'))
       .map(m => ({ id: m.id || crypto.randomUUID(), fecha: m.fecha, banco: m.banco, cantidad: Number(m.cantidad) || 0, concepto: m.concepto || '' }));
     this.datos = { registros, movimientos };

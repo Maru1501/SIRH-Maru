@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO, saldoInicialNecesario,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610262126';
-import { almacen, registroVacio } from './db.js?v=202610262126';
+} from './calc.js?v=202610292130';
+import { almacen, registroVacio } from './db.js?v=202610292130';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -57,7 +57,9 @@ function pintarEstado() {
   const txt = { local: 'Solo en este navegador', conectando: 'Conectando…', nube: 'Sincronizado con la base', error: 'Sin conexión a la base' }[almacen.estado];
   el.textContent = txt; el.title = almacen.error || '';
   $('#menu-sync').textContent = txt + (almacen.error ? ` · ${almacen.error}` : '');
-  pie.textContent = almacen.estado === 'nube' ? 'Guardado en la base de datos (Neon) y en este navegador'
+  const s = almacen.sync;
+  const fichadas = s && s.al ? ` · Fichadas al ${s.al}` : '';
+  pie.textContent = almacen.estado === 'nube' ? 'Guardado en la base de datos (Neon) y en este navegador' + fichadas
     : almacen.estado === 'error' ? `Guardado solo en este navegador · ${almacen.error}`
     : 'Guardado en este navegador · Conectá la base en Configuración para usarla desde cualquier dispositivo';
 }
@@ -71,10 +73,32 @@ function celdaBanco(c) {
   return `<span class="num gris">—</span>`;
 }
 
+/** Día laborable ya pasado y cubierto por la última sincronización, sin la fichada. */
+function faltaFichada(fecha, r, c) {
+  const sync = almacen.sync;
+  if (!sync || !sync.hasta || fecha >= hoyIso() || fecha > sync.hasta || c.justificado) return [];
+  const w = desdeIso(fecha).getDay();
+  if (w === 0 || w === 6) return [];
+  if (r.novedad && r.novedad !== 'Sin novedad') return [];
+  const faltan = [];
+  if (!r.entradaFichada) faltan.push('Sin fichada de entrada');
+  if (!r.salidaFichada) faltan.push('Sin fichada de salida');
+  return faltan;
+}
+
+/** Campo de hora: con fichada queda fijo (manda la fichada). */
+function campoHora(fecha, campo, r) {
+  const fichada = campo === 'entrada' ? r.entradaFichada : r.salidaFichada;
+  const etiqueta = campo === 'entrada' ? 'Entrada' : 'Salida';
+  return `<span class="lbl-movil">${etiqueta}</span><input class="campo hora${fichada ? ' fichada' : ''}" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" data-campo="${campo}" value="${esc(fichada || r[campo])}"`
+    + `${fichada ? ' disabled title="Hora de la fichada (no se cambia)"' : ''} aria-label="${etiqueta} ${fecha}">${fichada ? '<span class="marca-fichada" title="De la fichada">🕘</span>' : ''}`;
+}
+
 function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
   const r = rec || {};
   const hoy = fecha === hoyIso();
-  const avisos = c.avisos.length ? `<div class="aviso-dia">${esc(c.avisos.join(' · '))}</div>` : '';
+  const todosAvisos = [...c.avisos, ...faltaFichada(fecha, r, c)];
+  const avisos = todosAvisos.length ? `<div class="aviso-dia">${esc(todosAvisos.join(' · '))}</div>` : '';
   const completo = diaCompleto(r, c);
   const plegada = (completo || plegarVacio) && !ui.abiertos.has(fecha);
   const detalle = c.justificado ? r.novedad
@@ -91,8 +115,8 @@ function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
   const listo = !plegada && (completo || ui.abiertos.has(fecha)) ? `<div class="c-listo"><button class="boton" data-cerrar="${fecha}">Listo ✓</button></div>` : '';
   return `<div class="fila${hoy ? ' hoy' : ''}${sucia ? ' sucia' : ''}${plegada ? ' plegada' : ''}" data-fecha="${fecha}">${resumen}
     <div class="c-dia dia"><b>${nombreDia(fecha)} ${dd_mm(fecha)}</b>${hoy ? '<span class="etq">HOY</span>' : ''}${avisos}</div>
-    <div class="c-ent"><span class="lbl-movil">Entrada</span><input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" data-campo="entrada" value="${esc(r.entrada)}" aria-label="Entrada ${fecha}"></div>
-    <div class="c-sal"><span class="lbl-movil">Salida</span><input class="campo hora" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" data-campo="salida" value="${esc(r.salida)}" aria-label="Salida ${fecha}"></div>
+    <div class="c-ent">${campoHora(fecha, 'entrada', r)}</div>
+    <div class="c-sal">${campoHora(fecha, 'salida', r)}</div>
     <div class="c-nov"><span class="lbl-movil">Novedad</span><select class="campo" data-campo="novedad" aria-label="Novedad ${fecha}">${opcionesNovedad(r.novedad || 'Sin novedad')}</select></div>
     <div class="c-nota"><span class="lbl-movil">Nota</span><input class="campo" type="text" data-campo="nota" value="${esc(r.nota)}" placeholder="Nota" maxlength="200" aria-label="Nota ${fecha}"></div>
     <div class="c-trab"><span class="lbl-movil">Trabajadas</span><span class="num ${c.trabajadas ? 'ocre' : 'gris'}">${fmtHoras(c.trabajadas || null)}</span></div>
@@ -944,7 +968,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610262126';
+const VERSION = '202610292130';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
