@@ -317,3 +317,5 @@ details.plegable[open] > summary::before { transform: rotate(90deg); }
 /* Fichadas: la hora viene del reloj y queda fija */
 .campo.fichada { background: #eef6ee; color: #1f5130; border-color: #b7d8bf; font-weight: 600; cursor: not-allowed; }
 .marca-fichada { margin-left: 4px; font-size: 13px; }
+/* Sin fichada pero el día tiene novedad: mismo azul que la novedad (no es una fichada que falta) */
+.campo.con-novedad { background: var(--azul-claro); color: var(--azul); border-color: #c3d4e2; }
