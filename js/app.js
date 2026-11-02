@@ -1,8 +1,8 @@
 import {
   NOVEDADES, CONFIG_DEFAULT as CFG, calcularDia, calcularSemana, libroBancoHoras, libroBancoVacaciones, REINICIO, saldoInicialNecesario,
   fmtHoras, iso, desdeIso, lunesDe, sumarDias, diasLaborables,
-} from './calc.js?v=202610292215';
-import { almacen, registroVacio } from './db.js?v=202610292215';
+} from './calc.js?v=202611021930';
+import { almacen, registroVacio } from './db.js?v=202611021930';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -86,12 +86,18 @@ function faltaFichada(fecha, r, c) {
   return faltan;
 }
 
-/** Campo de hora: con fichada queda fijo (manda la fichada). */
+/** Campo de hora: con fichada queda fijo (manda la fichada).
+ *  Sin fichada pero con novedad: se pinta azul (como la novedad), así se
+ *  distingue de una fichada que falta (campo blanco). */
 function campoHora(fecha, campo, r) {
   const fichada = campo === 'entrada' ? r.entradaFichada : r.salidaFichada;
   const etiqueta = campo === 'entrada' ? 'Entrada' : 'Salida';
-  return `<span class="lbl-movil">${etiqueta}</span><input class="campo hora${fichada ? ' fichada' : ''}" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" data-campo="${campo}" value="${esc(fichada || r[campo])}"`
-    + `${fichada ? ' disabled title="Hora de la fichada (no se cambia)"' : ''} aria-label="${etiqueta} ${fecha}">${fichada ? '<span class="marca-fichada" title="De la fichada">🕘</span>' : ''}`;
+  const conNovedad = !fichada && r.novedad && r.novedad !== 'Sin novedad';
+  const clase = fichada ? ' fichada' : conNovedad ? ' con-novedad' : '';
+  const titulo = fichada ? ' disabled title="Hora de la fichada (no se cambia)"'
+    : conNovedad ? ` title="Sin fichada: el día tiene novedad (${esc(r.novedad)})"` : '';
+  return `<span class="lbl-movil">${etiqueta}</span><input class="campo hora${clase}" type="text" inputmode="numeric" placeholder="hh:mm" maxlength="5" autocomplete="off" data-campo="${campo}" value="${esc(fichada || r[campo])}"`
+    + `${titulo} aria-label="${etiqueta} ${fecha}">${fichada ? '<span class="marca-fichada" title="De la fichada">🕘</span>' : ''}`;
 }
 
 function filaDia(fecha, rec, c, { sucia = false, plegarVacio = false } = {}) {
@@ -968,7 +974,7 @@ window.addEventListener('beforeunload', e => { if (Object.keys(ui.borrador).leng
 
 // ---------- versión ----------
 // Si hay una versión publicada más nueva que la que está abierta, se recarga sola.
-const VERSION = '202610292215';
+const VERSION = '202611021930';
 async function verificarVersion() {
   if (Object.keys(ui.borrador).length) return;
   try {
